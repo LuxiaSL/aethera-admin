@@ -787,12 +787,30 @@ async function loadServices() {
  * Load services page with live SSE updates
  */
 function loadServicesLive() {
+  // Track if we've done the initial deps load
+  let initialDepsLoaded = false;
+  
   streams.connect('services', (data) => {
     aetheraStatus = data.aethera || null;
     currentSlots = data.slots || {};
     
     renderAetheraStatus();
     renderSlots();
+    
+    // Re-apply cached deps UI after renderSlots rebuilds the DOM
+    for (const slotName of Object.keys(currentSlots)) {
+      if (slotGitDeps[slotName]) {
+        updateSlotDepsUI(slotName);
+      }
+    }
+    
+    // Load git deps status for each slot (only once on initial load)
+    if (!initialDepsLoaded) {
+      initialDepsLoaded = true;
+      for (const slotName of Object.keys(currentSlots)) {
+        loadSlotDeps(slotName);
+      }
+    }
   });
 }
 
@@ -987,14 +1005,33 @@ async function loadSlotDeps(slot) {
 
 /**
  * Update the deps section in a slot card
+ * @param {string} slot - Slot name
+ * @param {boolean} forceLoading - If true, show loading state even if cached data exists
  */
-function updateSlotDepsUI(slot) {
+function updateSlotDepsUI(slot, forceLoading = false) {
   const container = document.getElementById(`slotDeps-${slot}`);
   if (!container) return;
   
   const deps = slotGitDeps[slot];
-  if (!deps || !deps.hasGitDeps) {
+  
+  // If no deps data yet and not forcing loading, leave as is (may show cached render)
+  if (!deps && !forceLoading) {
+    return;
+  }
+  
+  // If deps loaded and has no git deps, hide the section
+  if (deps && !deps.hasGitDeps) {
     container.innerHTML = '';
+    return;
+  }
+  
+  // If still loading (no cached data), show loading indicator
+  if (!deps) {
+    container.innerHTML = `
+      <div class="git-deps-loading">
+        <span class="spinner-sm"></span> Checking dependencies...
+      </div>
+    `;
     return;
   }
   
@@ -1186,12 +1223,13 @@ function renderSlots() {
             </div>
           ` : ''}
           
-          <!-- Git Dependencies Section (populated async) -->
+          <!-- Git Dependencies Section (populated async, preserved on re-render) -->
           <div id="slotDeps-${name}" class="slot-deps-container">
-            <!-- Loading indicator -->
-            <div class="git-deps-loading">
-              <span class="spinner-sm"></span> Checking dependencies...
-            </div>
+            ${slotGitDeps[name] ? '' : `
+              <div class="git-deps-loading">
+                <span class="spinner-sm"></span> Checking dependencies...
+              </div>
+            `}
           </div>
           
           <div class="slot-actions">
