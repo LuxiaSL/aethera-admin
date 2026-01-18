@@ -14,12 +14,12 @@ personal admin panel for managing my server; not just æthera the site but any b
 - **Config Editing** — Live YAML configuration editing with backup
 - **Log Streaming** — Real-time journalctl output per bot
 
-### 🌐 æthera Blog Control
+### 🌐 æthera control
 - **Docker Management** — Container status, restart, logs via Docker API
 - **Blog Post Management** — Create, edit, and publish posts with Markdown preview
 - **Direct Database Access** — Read/write to blog SQLite database
 
-### 🎨 Dream Window GPU Control
+### 🎨 Dreams GPU Control
 - **RunPod Integration** — Start/stop serverless GPU instances on demand
 - **Cost Tracking** — Live session cost estimates with uptime monitoring
 - **Status Aggregation** — Combined view of VPS (æthera) and RunPod state
@@ -291,7 +291,7 @@ RUNPOD_ENDPOINT_ID=...
 
 | Component | Repository | Description |
 |-----------|------------|-------------|
-| æthera Blog | [LuxiaSL/aethera](https://github.com/LuxiaSL/aethera) | Python/FastAPI blog with Dreams viewer |
+| æthera Blog | [LuxiaSL/aethera](https://github.com/LuxiaSL/aethera) | Python/FastAPI blog with extras |
 | Dream Gen | [LuxiaSL/dream_gen](https://github.com/LuxiaSL/dream_gen) | AI art generator for Dream Window |
 | ChapterX | [antra-tess/chapterx](https://github.com/antra-tess/chapterx) | Discord bot framework (upstream) |
 
