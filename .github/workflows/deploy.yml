@@ -1,0 +1,36 @@
+# .github/workflows/deploy.yml
+name: Deploy Admin Panel
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:  # Manual trigger
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy via rsync
+        uses: burnett01/rsync-deployments@7.0.2
+        with:
+          switches: -avz --delete --exclude='node_modules' --exclude='.env' --exclude='data/'
+          path: ./
+          remote_path: /opt/aethera-server/admin/
+          remote_host: ${{ secrets.VPS_HOST }}
+          remote_user: ${{ secrets.VPS_USER }}
+          remote_key: ${{ secrets.VPS_SSH_KEY }}
+
+      - name: Install dependencies and restart
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            cd /opt/aethera-server/admin
+            npm ci --omit=dev
+            sudo systemctl restart aethera-admin
+            echo "✓ Admin panel deployed"
