@@ -196,14 +196,15 @@ router.get('/:slot/bots', async (req, res) => {
 
 /**
  * POST /api/slots/:slot/npm-install
- * Run npm install for a slot
+ * Run npm install for a slot (also builds TypeScript by default)
  */
 router.post('/:slot/npm-install', async (req, res) => {
   try {
     const { slot } = req.params;
+    const { autoBuild = true } = req.body;
     
     console.log(`Running npm install for slot '${slot}'...`);
-    const result = await chapterx.npmInstall(slot);
+    const result = await chapterx.npmInstall(slot, { autoBuild });
     
     res.json({
       slot,
@@ -211,6 +212,37 @@ router.post('/:slot/npm-install', async (req, res) => {
     });
   } catch (error) {
     console.error('Error running npm install:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/slots/:slot/build
+ * Build TypeScript for a slot (compiles to dist/)
+ * Using compiled JS reduces memory from ~160MB to ~40MB per bot
+ */
+router.post('/:slot/build', async (req, res) => {
+  try {
+    const { slot } = req.params;
+    const { autoRestart = false } = req.body;
+    
+    console.log(`Building TypeScript for slot '${slot}'...`);
+    const result = await chapterx.buildSlot(slot);
+    
+    // Auto-restart bots if build succeeded and requested
+    let restartResults = null;
+    if (result.success && !result.skipped && autoRestart) {
+      console.log(`Build complete, restarting bots on slot '${slot}'...`);
+      restartResults = await chapterx.restartBotsOnSlot(slot);
+    }
+    
+    res.json({
+      slot,
+      ...result,
+      restartResults,
+    });
+  } catch (error) {
+    console.error('Error building slot:', error);
     res.status(500).json({ error: error.message });
   }
 });
