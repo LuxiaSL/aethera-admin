@@ -1,6 +1,6 @@
-# Aethera Admin Panel
+# æthera admin
 
-A personal server management dashboard for coordinating the Aethera ecosystem—including Discord bots (ChapterX), the Aethera blog platform, and the AI Dream Window GPU pipeline.
+personal admin panel for managing my server; not just æthera the site but any bots and other services i run as standalone on that server. i wouldn't recommend using this; design your own instead based on this pattern.
 
 ![Node.js](https://img.shields.io/badge/Node.js-v18+-339933?style=flat-square&logo=node.js&logoColor=white)
 ![Express](https://img.shields.io/badge/Express-5.x-000000?style=flat-square&logo=express&logoColor=white)
@@ -14,7 +14,7 @@ A personal server management dashboard for coordinating the Aethera ecosystem—
 - **Config Editing** — Live YAML configuration editing with backup
 - **Log Streaming** — Real-time journalctl output per bot
 
-### 🌐 Aethera Blog Control
+### 🌐 æthera Blog Control
 - **Docker Management** — Container status, restart, logs via Docker API
 - **Blog Post Management** — Create, edit, and publish posts with Markdown preview
 - **Direct Database Access** — Read/write to blog SQLite database
@@ -22,7 +22,7 @@ A personal server management dashboard for coordinating the Aethera ecosystem—
 ### 🎨 Dream Window GPU Control
 - **RunPod Integration** — Start/stop serverless GPU instances on demand
 - **Cost Tracking** — Live session cost estimates with uptime monitoring
-- **Status Aggregation** — Combined view of VPS (Aethera) and RunPod state
+- **Status Aggregation** — Combined view of VPS (æthera) and RunPod state
 - **Admin Override** — Force start/stop bypassing presence-based auto-scaling
 
 ### 📦 Deployment Slots
@@ -79,7 +79,7 @@ admin/
 
 - **Node.js** 18+ (uses native `fetch`, `--watch`)
 - **systemd** — For ChapterX bot service management
-- **Docker** — For Aethera blog container management
+- **Docker** — For æthera blog container management
 - Access to sibling directories: `bots/`, `core/`, `chapterx/`
 
 ### Setup
@@ -291,7 +291,7 @@ RUNPOD_ENDPOINT_ID=...
 
 | Component | Repository | Description |
 |-----------|------------|-------------|
-| Aethera Blog | [LuxiaSL/aethera](https://github.com/LuxiaSL/aethera) | Python/FastAPI blog with Dreams viewer |
+| æthera Blog | [LuxiaSL/aethera](https://github.com/LuxiaSL/aethera) | Python/FastAPI blog with Dreams viewer |
 | Dream Gen | [LuxiaSL/dream_gen](https://github.com/LuxiaSL/dream_gen) | AI art generator for Dream Window |
 | ChapterX | [antra-tess/chapterx](https://github.com/antra-tess/chapterx) | Discord bot framework (upstream) |
 
