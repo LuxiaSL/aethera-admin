@@ -22,11 +22,58 @@ const CORE_PATH = process.env.CORE_PATH || path.join(BASE_PATH, 'core');
 const BOTS_PATH = process.env.BOTS_PATH || path.join(BASE_PATH, 'bots');
 const CHAPTERX_PATH = process.env.CHAPTERX_PATH || path.join(BASE_PATH, 'chapterx');
 
-// ChapterX deployment slots
-const CHAPTERX_SLOTS = {
-  main: path.join(CHAPTERX_PATH, 'main'),
-  dev: path.join(CHAPTERX_PATH, 'dev'),
-};
+// ChapterX deployment slots - dynamically scanned
+/**
+ * Scan CHAPTERX_PATH for deployment slot directories
+ * A valid slot is a directory containing a .git folder
+ * @returns {Object} Map of slot name to path
+ */
+function scanChapterXSlots() {
+  const fs = require('fs');
+  const slots = {};
+  
+  if (!fs.existsSync(CHAPTERX_PATH)) {
+    return slots;
+  }
+  
+  const entries = fs.readdirSync(CHAPTERX_PATH, { withFileTypes: true });
+  
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    if (entry.name.startsWith('.')) continue; // Skip hidden dirs
+    
+    const slotPath = path.join(CHAPTERX_PATH, entry.name);
+    const gitDir = path.join(slotPath, '.git');
+    
+    // Valid slot if it contains a .git directory (is a git repo)
+    if (fs.existsSync(gitDir)) {
+      slots[entry.name] = slotPath;
+    }
+  }
+  
+  return slots;
+}
+
+// Cache for slots (refreshed on each access via getter)
+let _cachedSlots = null;
+let _cacheTime = 0;
+const CACHE_TTL = 5000; // 5 second cache
+
+/**
+ * Get ChapterX slots with short-term caching
+ * @returns {Object} Map of slot name to path
+ */
+function getChapterXSlots() {
+  const now = Date.now();
+  if (!_cachedSlots || (now - _cacheTime) > CACHE_TTL) {
+    _cachedSlots = scanChapterXSlots();
+    _cacheTime = now;
+  }
+  return _cachedSlots;
+}
+
+// For backwards compatibility, provide static reference (scanned once at startup)
+const CHAPTERX_SLOTS = scanChapterXSlots();
 
 // ============================================================================
 // AETHERA (CORE) INTEGRATION
@@ -98,6 +145,8 @@ module.exports = {
   BOTS_PATH,
   CHAPTERX_PATH,
   CHAPTERX_SLOTS,
+  getChapterXSlots,  // Dynamic slot getter (recommended)
+  scanChapterXSlots, // Force rescan
   
   // Aethera integration
   AETHERA_API_URL,

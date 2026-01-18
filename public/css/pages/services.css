@@ -8,25 +8,28 @@
 }
 
 .services-section-title {
-  font-size: var(--text-lg);
-  font-weight: 600;
+  font-size: var(--text-base);
+  font-weight: 400;
   margin-bottom: var(--space-md);
   display: flex;
   align-items: center;
   gap: var(--space-sm);
+  color: var(--text-secondary);
+  letter-spacing: 0.03em;
 }
 
 /* Service Card */
 .service-card {
-  background: var(--surface-elevated);
-  border-radius: var(--radius-lg);
+  background: var(--bg-secondary);
   border: 1px solid var(--border-subtle);
   padding: var(--space-lg);
-  transition: border-color 0.2s ease;
+  transition: all var(--transition-fast);
+  box-shadow: var(--glow-subtle);
 }
 
 .service-card:hover {
-  border-color: var(--border-default);
+  box-shadow: var(--glow-medium);
+  border-color: var(--border-color);
 }
 
 .service-card-header {
@@ -41,8 +44,8 @@
 }
 
 .service-card-name {
-  font-size: var(--text-xl);
-  font-weight: 600;
+  font-size: var(--text-lg);
+  font-weight: 400;
   display: flex;
   align-items: center;
   gap: var(--space-sm);
@@ -52,16 +55,16 @@
   font-size: var(--text-xs);
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  background: var(--surface-default);
+  letter-spacing: 0.08em;
+  background: var(--bg-tertiary);
   padding: 2px 8px;
-  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
   margin-left: var(--space-sm);
 }
 
 .service-card-description {
   font-size: var(--text-sm);
-  color: var(--text-secondary);
+  color: var(--text-muted);
   margin-top: var(--space-xs);
 }
 
@@ -77,23 +80,25 @@
   align-items: center;
   gap: var(--space-xs);
   padding: var(--space-xs) var(--space-sm);
-  border-radius: var(--radius-full);
   font-size: var(--text-sm);
-  font-weight: 500;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-tertiary);
 }
 
 .service-status-badge.running {
-  background: rgba(16, 185, 129, 0.15);
+  background: rgba(74, 222, 128, 0.1);
+  border-color: rgba(74, 222, 128, 0.3);
   color: var(--status-success);
 }
 
 .service-status-badge.stopped {
-  background: rgba(107, 114, 128, 0.15);
+  background: var(--bg-tertiary);
   color: var(--text-muted);
 }
 
 .service-status-badge.unhealthy {
-  background: rgba(239, 68, 68, 0.15);
+  background: rgba(248, 113, 113, 0.1);
+  border-color: rgba(248, 113, 113, 0.3);
   color: var(--status-error);
 }
 
@@ -117,8 +122,8 @@
   gap: var(--space-md);
   margin-bottom: var(--space-md);
   padding: var(--space-md);
-  background: var(--surface-default);
-  border-radius: var(--radius-md);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-subtle);
 }
 
 .service-stat {
@@ -131,13 +136,13 @@
   font-size: var(--text-xs);
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.08em;
 }
 
 .service-stat-value {
   font-size: var(--text-sm);
-  font-weight: 500;
   font-family: var(--font-mono);
+  color: var(--text-primary);
 }
 
 /* Service Actions */
@@ -153,19 +158,21 @@
 
 .slots-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
   gap: var(--space-lg);
 }
 
 .slot-card-full {
-  background: var(--surface-elevated);
-  border-radius: var(--radius-lg);
+  background: var(--bg-secondary);
   border: 1px solid var(--border-subtle);
   overflow: hidden;
+  box-shadow: var(--glow-subtle);
+  transition: all var(--transition-fast);
 }
 
 .slot-card-full:hover {
-  border-color: var(--border-default);
+  box-shadow: var(--glow-medium);
+  border-color: var(--border-color);
 }
 
 .slot-card-header {
@@ -173,7 +180,7 @@
   justify-content: space-between;
   align-items: center;
   padding: var(--space-md) var(--space-lg);
-  background: var(--surface-default);
+  background: var(--bg-tertiary);
   border-bottom: 1px solid var(--border-subtle);
 }
 
@@ -184,10 +191,10 @@
 }
 
 .slot-name-badge {
-  font-size: var(--text-lg);
-  font-weight: 700;
+  font-size: var(--text-base);
+  font-weight: 400;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.1em;
 }
 
 .slot-name-badge.main {
@@ -201,16 +208,18 @@
 .slot-exists-badge {
   font-size: var(--text-xs);
   padding: 2px 8px;
-  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
 }
 
 .slot-exists-badge.exists {
-  background: rgba(16, 185, 129, 0.15);
+  background: rgba(74, 222, 128, 0.1);
+  border-color: rgba(74, 222, 128, 0.3);
   color: var(--status-success);
 }
 
 .slot-exists-badge.missing {
-  background: rgba(239, 68, 68, 0.15);
+  background: rgba(248, 113, 113, 0.1);
+  border-color: rgba(248, 113, 113, 0.3);
   color: var(--status-error);
 }
 
@@ -234,7 +243,7 @@
   font-size: var(--text-xs);
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.08em;
   min-width: 80px;
 }
 
@@ -244,12 +253,11 @@
 }
 
 .slot-git-value.branch {
-  color: var(--accent-primary);
-  font-weight: 500;
+  color: var(--text-secondary);
 }
 
 .slot-git-value.commit {
-  color: var(--text-secondary);
+  color: var(--text-muted);
 }
 
 .slot-git-value.dirty {
@@ -261,12 +269,12 @@
 }
 
 .slot-git-value.ahead {
-  color: var(--accent-primary);
+  color: var(--text-secondary);
 }
 
 .slot-commit-message {
   font-size: var(--text-sm);
-  color: var(--text-secondary);
+  color: var(--text-muted);
   font-style: italic;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -291,10 +299,9 @@
 }
 
 .branch-selector select {
-  background: var(--surface-default);
+  background: var(--bg-tertiary);
   color: var(--text-primary);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
   padding: var(--space-xs) var(--space-sm);
   font-size: var(--text-sm);
   font-family: var(--font-mono);
@@ -303,15 +310,16 @@
 
 .branch-selector select:focus {
   outline: none;
-  border-color: var(--accent-primary);
+  border-color: var(--text-muted);
+  box-shadow: var(--glow-subtle);
 }
 
 /* Running Bots */
 .slot-running-bots {
   margin-top: var(--space-md);
   padding: var(--space-sm) var(--space-md);
-  background: var(--surface-default);
-  border-radius: var(--radius-md);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-subtle);
   font-size: var(--text-sm);
 }
 
@@ -322,7 +330,6 @@
 
 .slot-running-bots-list {
   color: var(--text-primary);
-  font-weight: 500;
 }
 
 /* ==========================================================================
@@ -330,9 +337,8 @@
    ========================================================================== */
 
 .docker-unavailable {
-  background: rgba(251, 191, 36, 0.1);
-  border: 1px solid var(--status-warning);
-  border-radius: var(--radius-md);
+  background: rgba(250, 204, 21, 0.05);
+  border: 1px solid rgba(250, 204, 21, 0.3);
   padding: var(--space-md);
   margin-bottom: var(--space-lg);
   display: flex;
@@ -369,5 +375,3 @@
     justify-content: center;
   }
 }
-
-

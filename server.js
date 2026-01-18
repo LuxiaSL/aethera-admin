@@ -78,7 +78,7 @@ app.use((err, req, res, next) => {
 async function startup() {
   console.log('');
   console.log('='.repeat(60));
-  console.log('  Aethera Admin Panel');
+  console.log('  æthera admin panel');
   console.log('='.repeat(60));
   
   // Load sessions from file

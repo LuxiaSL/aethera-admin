@@ -1,43 +1,59 @@
-/* variables.css - Design tokens for aethera-admin */
+/* variables.css - æthera admin design tokens
+ * Aesthetic: Terminal meets void - cyberpunk with sharp geometry
+ */
+
+@font-face {
+  font-family: 'Libertinus Mono';
+  src: url('https://aetherawi.red/static/fonts/LibertinusMono-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
 
 :root {
-  /* Color Palette - Deep space with ethereal accents */
-  --bg-primary: #0a0a0f;
-  --bg-secondary: #12121a;
-  --bg-tertiary: #1a1a24;
-  --bg-elevated: #22222e;
+  /* Color Palette - Pure void with high contrast */
+  --bg-primary: #000000;
+  --bg-secondary: #050508;
+  --bg-tertiary: #0a0a0f;
+  --bg-elevated: #0f0f14;
   
-  /* Text */
-  --text-primary: #e8e6f0;
-  --text-secondary: #9090a8;
-  --text-muted: #5a5a70;
+  /* Text - High contrast */
+  --text-primary: #ffffff;
+  --text-secondary: #888899;
+  --text-muted: #555566;
   
-  /* Borders */
-  --border-color: #2a2a3a;
-  --border-subtle: #1e1e2a;
+  /* Borders - Subtle */
+  --border-color: #1a1a24;
+  --border-subtle: #111118;
   
-  /* Accent colors - ethereal/dreamy palette */
-  --accent-primary: #7c5cbf;      /* Soft purple */
-  --accent-primary-hover: #9370db;
-  --accent-secondary: #4a9eff;    /* Electric blue */
-  --accent-tertiary: #ff6b9d;     /* Rose pink */
+  /* Accent colors - Minimal, let content breathe */
+  --accent-primary: #ffffff;
+  --accent-primary-hover: #cccccc;
+  --accent-secondary: #888899;
+  --accent-tertiary: #666677;
   
-  /* Status colors */
+  /* Status colors - Slightly desaturated */
   --status-success: #4ade80;
-  --status-warning: #fbbf24;
+  --status-warning: #facc15;
   --status-error: #f87171;
   --status-info: #60a5fa;
   
   /* Semantic */
   --running: #4ade80;
-  --stopped: #6b7280;
-  --starting: #fbbf24;
+  --stopped: #555566;
+  --starting: #facc15;
+  
+  /* Glow effects - Core æthera aesthetic */
+  --glow-subtle: 0 0 40px rgba(255, 255, 255, 0.04);
+  --glow-medium: 0 0 60px rgba(255, 255, 255, 0.06);
+  --glow-strong: 0 0 80px rgba(255, 255, 255, 0.1);
+  --glow-success: 0 0 20px rgba(74, 222, 128, 0.2);
+  --glow-error: 0 0 20px rgba(248, 113, 113, 0.2);
   
   /* Shadows */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.5);
-  --shadow-glow: 0 0 20px rgba(124, 92, 191, 0.3);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.8);
+  --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.8);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.9);
   
   /* Spacing */
   --space-xs: 0.25rem;
@@ -47,16 +63,16 @@
   --space-xl: 2rem;
   --space-2xl: 3rem;
   
-  /* Border radius */
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
-  --radius-full: 9999px;
+  /* Border radius - SHARP (zero) */
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-xl: 0;
+  --radius-full: 0;
   
-  /* Typography */
-  --font-sans: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  /* Typography - Unified monospace */
+  --font-sans: 'Libertinus Mono', 'JetBrains Mono', 'Fira Code', monospace;
+  --font-mono: 'Libertinus Mono', 'JetBrains Mono', 'Fira Code', monospace;
   
   --text-xs: 0.75rem;
   --text-sm: 0.875rem;
@@ -78,4 +94,3 @@
   --z-modal: 300;
   --z-toast: 400;
 }
-

@@ -1,6 +1,5 @@
 /* ==========================================================================
    Dreams Page Styles
-   Extends service card patterns with dreams-specific components
    ========================================================================== */
 
 /* ==========================================================================
@@ -8,15 +7,16 @@
    ========================================================================== */
 
 .gpu-card {
-  background: var(--surface-elevated);
-  border-radius: var(--radius-lg);
+  background: var(--bg-secondary);
   border: 1px solid var(--border-subtle);
   overflow: hidden;
-  transition: border-color 0.2s ease;
+  transition: all var(--transition-fast);
+  box-shadow: var(--glow-subtle);
 }
 
 .gpu-card:hover {
-  border-color: var(--border-default);
+  box-shadow: var(--glow-medium);
+  border-color: var(--border-color);
 }
 
 .gpu-card-header {
@@ -24,10 +24,7 @@
   justify-content: space-between;
   align-items: center;
   padding: var(--space-lg);
-  background: linear-gradient(135deg, 
-    rgba(139, 92, 246, 0.1) 0%, 
-    rgba(59, 130, 246, 0.05) 100%
-  );
+  background: var(--bg-tertiary);
   border-bottom: 1px solid var(--border-subtle);
 }
 
@@ -38,13 +35,15 @@
 }
 
 .gpu-card-title h3 {
-  font-size: var(--text-xl);
-  font-weight: 600;
+  font-size: var(--text-lg);
+  font-weight: 400;
   margin: 0;
+  letter-spacing: 0.03em;
 }
 
 .gpu-card-title .emoji {
-  font-size: 1.5em;
+  font-size: 1.25em;
+  opacity: 0.7;
 }
 
 .gpu-card-subtitle {
@@ -58,45 +57,48 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-xs);
-  padding: var(--space-sm) var(--space-md);
-  border-radius: var(--radius-full);
+  padding: var(--space-xs) var(--space-md);
   font-size: var(--text-sm);
-  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.08em;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-tertiary);
 }
 
 .gpu-state-badge.running {
-  background: rgba(16, 185, 129, 0.2);
+  background: rgba(74, 222, 128, 0.1);
+  border-color: rgba(74, 222, 128, 0.3);
   color: var(--status-success);
-  box-shadow: 0 0 12px rgba(16, 185, 129, 0.3);
+  box-shadow: var(--glow-success);
   animation: pulse-glow 2s ease-in-out infinite;
 }
 
 .gpu-state-badge.starting {
-  background: rgba(251, 191, 36, 0.2);
+  background: rgba(250, 204, 21, 0.1);
+  border-color: rgba(250, 204, 21, 0.3);
   color: var(--status-warning);
   animation: pulse-glow 1s ease-in-out infinite;
 }
 
 .gpu-state-badge.idle {
-  background: rgba(107, 114, 128, 0.2);
+  background: var(--bg-tertiary);
   color: var(--text-muted);
 }
 
 .gpu-state-badge.not_configured {
-  background: rgba(239, 68, 68, 0.15);
+  background: rgba(248, 113, 113, 0.1);
+  border-color: rgba(248, 113, 113, 0.3);
   color: var(--status-error);
 }
 
 .gpu-state-badge.unknown {
-  background: rgba(107, 114, 128, 0.15);
+  background: var(--bg-tertiary);
   color: var(--text-muted);
 }
 
 @keyframes pulse-glow {
   0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
+  50% { opacity: 0.6; }
 }
 
 /* GPU Card Body */
@@ -110,12 +112,12 @@
 
 .gpu-stats {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: var(--space-md);
   margin-bottom: var(--space-lg);
   padding: var(--space-md);
-  background: var(--surface-default);
-  border-radius: var(--radius-md);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-subtle);
 }
 
 .gpu-stat {
@@ -128,17 +130,17 @@
   font-size: var(--text-xs);
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.08em;
 }
 
 .gpu-stat-value {
-  font-size: var(--text-lg);
-  font-weight: 600;
+  font-size: var(--text-base);
   font-family: var(--font-mono);
+  color: var(--text-primary);
 }
 
 .gpu-stat-value.highlight {
-  color: var(--accent-primary);
+  color: var(--text-primary);
 }
 
 .gpu-stat-value.success {
@@ -162,13 +164,9 @@
   align-items: center;
   justify-content: space-between;
   padding: var(--space-md);
-  background: linear-gradient(90deg, 
-    rgba(16, 185, 129, 0.1) 0%, 
-    rgba(16, 185, 129, 0.05) 100%
-  );
-  border-radius: var(--radius-md);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-subtle);
   margin-bottom: var(--space-lg);
-  border: 1px solid rgba(16, 185, 129, 0.2);
 }
 
 .gpu-cost-info {
@@ -181,12 +179,11 @@
   font-size: var(--text-xs);
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.08em;
 }
 
 .gpu-cost-value {
   font-size: var(--text-2xl);
-  font-weight: 700;
   font-family: var(--font-mono);
   color: var(--status-success);
 }
@@ -203,41 +200,51 @@
 
 .gpu-actions {
   display: flex;
-  gap: var(--space-md);
+  gap: var(--space-sm);
   flex-wrap: wrap;
+  margin-bottom: var(--space-md);
 }
 
 .gpu-actions .btn {
   flex: 1;
-  min-width: 120px;
+  min-width: 100px;
   justify-content: center;
+  padding: var(--space-sm) var(--space-md);
 }
 
 .btn-start {
-  background: var(--status-success);
-  color: white;
+  background: transparent;
+  color: var(--status-success);
+  border: 1px solid var(--status-success);
 }
 
 .btn-start:hover:not(:disabled) {
-  background: #059669;
+  background: var(--status-success);
+  color: var(--bg-primary);
+  box-shadow: var(--glow-success);
 }
 
 .btn-stop {
-  background: var(--status-error);
-  color: white;
+  background: transparent;
+  color: var(--status-error);
+  border: 1px solid var(--status-error);
 }
 
 .btn-stop:hover:not(:disabled) {
-  background: #dc2626;
+  background: var(--status-error);
+  color: var(--bg-primary);
+  box-shadow: var(--glow-error);
 }
 
 .btn-restart {
-  background: var(--status-warning);
-  color: white;
+  background: transparent;
+  color: var(--status-warning);
+  border: 1px solid var(--status-warning);
 }
 
 .btn-restart:hover:not(:disabled) {
-  background: #d97706;
+  background: var(--status-warning);
+  color: var(--bg-primary);
 }
 
 /* ==========================================================================
@@ -249,23 +256,23 @@
   align-items: center;
   gap: var(--space-sm);
   padding: var(--space-md);
-  background: var(--surface-default);
-  border-radius: var(--radius-md);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-subtle);
   margin-bottom: var(--space-lg);
   font-size: var(--text-sm);
   color: var(--text-secondary);
 }
 
 .gpu-status-message.starting {
-  background: rgba(251, 191, 36, 0.1);
+  background: rgba(250, 204, 21, 0.05);
+  border-color: rgba(250, 204, 21, 0.3);
   color: var(--status-warning);
-  border: 1px solid rgba(251, 191, 36, 0.2);
 }
 
 .gpu-status-message.error {
-  background: rgba(239, 68, 68, 0.1);
+  background: rgba(248, 113, 113, 0.05);
+  border-color: rgba(248, 113, 113, 0.3);
   color: var(--status-error);
-  border: 1px solid rgba(239, 68, 68, 0.2);
 }
 
 /* ==========================================================================
@@ -273,19 +280,19 @@
    ========================================================================== */
 
 .runpod-info {
-  background: var(--surface-default);
-  border-radius: var(--radius-md);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-subtle);
   padding: var(--space-md);
   margin-bottom: var(--space-lg);
 }
 
 .runpod-info-title {
   font-size: var(--text-sm);
-  font-weight: 600;
   margin-bottom: var(--space-sm);
   display: flex;
   align-items: center;
   gap: var(--space-xs);
+  color: var(--text-secondary);
 }
 
 .runpod-info-grid {
@@ -303,12 +310,14 @@
 .runpod-stat-label {
   font-size: var(--text-xs);
   color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .runpod-stat-value {
   font-size: var(--text-sm);
-  font-weight: 500;
   font-family: var(--font-mono);
+  color: var(--text-primary);
 }
 
 /* ==========================================================================
@@ -316,19 +325,19 @@
    ========================================================================== */
 
 .aethera-info {
-  background: var(--surface-default);
-  border-radius: var(--radius-md);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-subtle);
   padding: var(--space-md);
   margin-bottom: var(--space-lg);
 }
 
 .aethera-info-title {
   font-size: var(--text-sm);
-  font-weight: 600;
   margin-bottom: var(--space-sm);
   display: flex;
   align-items: center;
   gap: var(--space-xs);
+  color: var(--text-secondary);
 }
 
 .aethera-info-grid {
@@ -342,9 +351,8 @@
    ========================================================================== */
 
 .config-warning {
-  background: rgba(251, 191, 36, 0.1);
-  border: 1px solid var(--status-warning);
-  border-radius: var(--radius-md);
+  background: rgba(250, 204, 21, 0.05);
+  border: 1px solid rgba(250, 204, 21, 0.3);
   padding: var(--space-md);
   margin-bottom: var(--space-lg);
   display: flex;
@@ -364,19 +372,20 @@
 }
 
 .config-warning-title {
-  font-weight: 600;
+  font-weight: 400;
   margin-bottom: var(--space-xs);
+  color: var(--status-warning);
 }
 
 .config-warning-text {
   font-size: var(--text-sm);
-  color: var(--text-secondary);
+  color: var(--text-muted);
 }
 
 .config-warning-text code {
-  background: rgba(0, 0, 0, 0.2);
+  background: rgba(255, 255, 255, 0.1);
   padding: 2px 6px;
-  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
 }
@@ -398,17 +407,19 @@
   align-items: center;
   gap: var(--space-xs);
   font-size: var(--text-sm);
-  color: var(--accent-primary);
+  color: var(--text-secondary);
   text-decoration: none;
-  transition: color 0.2s ease;
+  transition: color var(--transition-fast);
+  padding: var(--space-xs) 0;
 }
 
 .quick-link:hover {
-  color: var(--accent-secondary);
+  color: var(--text-primary);
 }
 
 .quick-link-icon {
-  font-size: 1.1em;
+  font-size: 1em;
+  opacity: 0.7;
 }
 
 /* ==========================================================================
@@ -449,4 +460,3 @@
     gap: var(--space-sm);
   }
 }
-

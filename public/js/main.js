@@ -257,7 +257,7 @@ async function loadDashboard() {
     document.getElementById('dashboardServices').innerHTML = `
       <div style="display: flex; align-items: center; gap: var(--space-md); padding: var(--space-sm) 0;">
         <span class="status-dot ${running ? 'running' : 'stopped'}"></span>
-        <span style="flex: 1;">aethera</span>
+        <span style="flex: 1;">æthera</span>
         <span style="color: ${running ? 'var(--status-success)' : 'var(--text-muted)'}; font-size: var(--text-sm);">
           ${running ? 'Running' : 'Stopped'}${health === 'healthy' ? ' ✓' : health === 'unhealthy' ? ' ✗' : ''}
         </span>
@@ -407,10 +407,12 @@ function renderBotsGrid() {
         </div>
       </div>
       
-      ${!bot.running && canControl ? `
+      ${!bot.running && canControl && Object.keys(currentSlots).length > 0 ? `
         <div class="slot-selector">
-          <button class="slot-btn active" data-slot="main" onclick="selectSlot('${bot.name}', 'main', this)">main</button>
-          <button class="slot-btn" data-slot="dev" onclick="selectSlot('${bot.name}', 'dev', this)">dev</button>
+          ${Object.keys(currentSlots).map((slotName, idx) => `
+            <button class="slot-btn ${idx === 0 ? 'active' : ''}" data-slot="${slotName}" 
+                    onclick="selectSlot('${bot.name}', '${slotName}', this)">${slotName}</button>
+          `).join('')}
         </div>
       ` : ''}
       
@@ -441,7 +443,12 @@ function selectSlot(botName, slot, btn) {
 }
 
 function getSelectedSlot(botName) {
-  return selectedSlots[botName] || 'main';
+  if (selectedSlots[botName]) {
+    return selectedSlots[botName];
+  }
+  // Default to first available slot, or 'main' as fallback
+  const slotNames = Object.keys(currentSlots);
+  return slotNames.includes('main') ? 'main' : (slotNames[0] || 'main');
 }
 
 // Bot menu toggle
@@ -666,7 +673,7 @@ async function refreshAetheraStatus() {
     renderAetheraStatus();
   } catch (error) {
     console.error('Error loading aethera status:', error);
-    showToast('Failed to load aethera status', 'error');
+    showToast('Failed to load æthera status', 'error');
   }
 }
 
@@ -736,36 +743,36 @@ function formatUptime(seconds) {
 
 async function startAethera() {
   try {
-    showToast('Starting aethera...', 'info');
+    showToast('Starting æthera...', 'info');
     await api.services.aetheraStart();
-    showToast('Aethera started', 'success');
+    showToast('æthera started', 'success');
     await refreshAetheraStatus();
   } catch (error) {
-    showToast(error.message || 'Failed to start aethera', 'error');
+    showToast(error.message || 'Failed to start æthera', 'error');
   }
 }
 
 async function stopAethera() {
-  if (!confirm('Stop aethera? The blog will be unavailable.')) return;
+  if (!confirm('Stop æthera? The blog will be unavailable.')) return;
   
   try {
-    showToast('Stopping aethera...', 'info');
+    showToast('Stopping æthera...', 'info');
     await api.services.aetheraStop();
-    showToast('Aethera stopped', 'success');
+    showToast('æthera stopped', 'success');
     await refreshAetheraStatus();
   } catch (error) {
-    showToast(error.message || 'Failed to stop aethera', 'error');
+    showToast(error.message || 'Failed to stop æthera', 'error');
   }
 }
 
 async function restartAethera() {
   try {
-    showToast('Restarting aethera...', 'info');
+    showToast('Restarting æthera...', 'info');
     await api.services.aetheraRestart();
-    showToast('Aethera restarted', 'success');
+    showToast('æthera restarted', 'success');
     await refreshAetheraStatus();
   } catch (error) {
-    showToast(error.message || 'Failed to restart aethera', 'error');
+    showToast(error.message || 'Failed to restart æthera', 'error');
   }
 }
 
