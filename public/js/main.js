@@ -1098,6 +1098,9 @@ async function viewSlotDiff(slot) {
       filesList.innerHTML = '<li class="no-changes">No modified files</li>';
     }
     
+    // Store raw diff for copy functionality
+    currentRawDiff = data.diff || data.diffStat || '';
+    
     // Render diff output
     if (data.diff) {
       diffOutput.innerHTML = formatDiffOutput(data.diff);
@@ -1105,6 +1108,7 @@ async function viewSlotDiff(slot) {
       diffOutput.textContent = data.diffStat;
     } else {
       diffOutput.textContent = 'No tracked file changes (may only have untracked files)';
+      currentRawDiff = '';
     }
     
     // Show truncation warning
@@ -1141,6 +1145,32 @@ function closeDiffModal(event) {
   const modal = document.getElementById('diffModal');
   modal.classList.remove('active');
   currentDiffSlot = null;
+}
+
+// Store raw diff for copying
+let currentRawDiff = '';
+
+async function copyDiffToClipboard() {
+  if (!currentRawDiff) {
+    showToast('No diff to copy', 'warning');
+    return;
+  }
+  
+  try {
+    await navigator.clipboard.writeText(currentRawDiff);
+    showToast('Diff copied to clipboard', 'success');
+  } catch (error) {
+    // Fallback for older browsers
+    const textarea = document.createElement('textarea');
+    textarea.value = currentRawDiff;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textarea);
+    showToast('Diff copied to clipboard', 'success');
+  }
 }
 
 async function discardSlotChanges() {
@@ -1185,6 +1215,7 @@ window.checkoutSlot = checkoutSlot;
 window.viewSlotDiff = viewSlotDiff;
 window.closeDiffModal = closeDiffModal;
 window.discardSlotChanges = discardSlotChanges;
+window.copyDiffToClipboard = copyDiffToClipboard;
 
 // ============================================================================
 // DREAMS MANAGEMENT
