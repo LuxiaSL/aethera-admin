@@ -4,7 +4,7 @@
 
 @font-face {
   font-family: 'Libertinus Mono';
-  src: url('https://aetherawi.red/static/fonts/LibertinusMono-Regular.ttf') format('truetype');
+  src: url('/fonts/LibertinusMono-Regular.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
   font-display: swap;
