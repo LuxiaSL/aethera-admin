@@ -135,6 +135,18 @@ const api = {
     async getSlots() {
       return api.request('/bots/slots/info');
     },
+    
+    /**
+     * Set preferred slot for a bot (persists selection)
+     * @param {string} name - Bot name
+     * @param {string} slot - Slot name
+     */
+    async setSlot(name, slot) {
+      return api.request(`/bots/${name}/slot`, {
+        method: 'POST',
+        body: { slot },
+      });
+    },
   },
   
   // ============================================================================

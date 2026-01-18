@@ -222,5 +222,32 @@ router.get('/slots/info', async (req, res) => {
   }
 });
 
+/**
+ * POST /api/bots/:name/slot
+ * Set preferred slot for a bot (persists selection before starting)
+ */
+router.post('/:name/slot', async (req, res) => {
+  try {
+    const { name } = req.params;
+    const { slot } = req.body;
+    
+    if (!slot) {
+      return res.status(400).json({ error: 'Slot is required' });
+    }
+    
+    console.log(`Setting preferred slot for '${name}' to '${slot}'`);
+    await chapterx.setPreferredSlot(name, slot);
+    
+    res.json({ 
+      success: true,
+      name,
+      slot,
+    });
+  } catch (error) {
+    console.error('Error setting preferred slot:', error);
+    res.status(400).json({ error: error.message });
+  }
+});
+
 module.exports = router;
 

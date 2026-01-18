@@ -548,16 +548,24 @@ function renderBotsGrid() {
   container.innerHTML = systemdWarning + html;
 }
 
-// Bot slot selection state
+// Bot slot selection state (local cache, also persisted to backend)
 const selectedSlots = {};
 
-function selectSlot(botName, slot, btn) {
+async function selectSlot(botName, slot, btn) {
   selectedSlots[botName] = slot;
   
-  // Update UI
+  // Update UI immediately
   const parent = btn.parentElement;
   parent.querySelectorAll('.slot-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
+  
+  // Persist to backend (so auto-refresh preserves the selection)
+  try {
+    await api.bots.setSlot(botName, slot);
+  } catch (error) {
+    console.error('Failed to persist slot selection:', error);
+    // Don't show error toast - the local selection still works
+  }
 }
 
 function getSelectedSlot(botName) {
