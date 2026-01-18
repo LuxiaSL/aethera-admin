@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aethera Admin</title>
+  
+  <!-- Favicon -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✦</text></svg>">
+  
+  <!-- CSS -->
+  <link rel="stylesheet" href="/css/variables.css">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/pages/login.css">
+  <link rel="stylesheet" href="/css/pages/bots.css">
+  <link rel="stylesheet" href="/css/pages/services.css">
+  <link rel="stylesheet" href="/css/pages/dreams.css">
+  <link rel="stylesheet" href="/css/pages/blog.css">
+</head>
+<body>
+  <!-- Login Screen -->
+  <div id="loginScreen" class="login-screen">
+    <div class="login-box">
+      <div class="login-header">
+        <div class="login-logo">✦</div>
+        <h1 class="login-title">Aethera Admin</h1>
+        <p class="login-subtitle">Server Management Panel</p>
+      </div>
+      
+      <div id="loginError" class="login-error" style="display: none;"></div>
+      
+      <form id="loginForm" class="login-form">
+        <div class="form-group">
+          <label class="form-label" for="username">Username</label>
+          <input 
+            type="text" 
+            id="username" 
+            name="username" 
+            class="form-input"
+            autocomplete="username"
+            required
+          >
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label" for="password">Password</label>
+          <div class="password-wrapper">
+            <input 
+              type="password" 
+              id="password" 
+              name="password" 
+              class="form-input"
+              autocomplete="current-password"
+              required
+            >
+            <button type="button" class="password-toggle" onclick="togglePassword()" title="Toggle password visibility">
+              👁
+            </button>
+          </div>
+        </div>
+        
+        <button type="submit" class="btn-primary">
+          <span id="loginBtnText">Login</span>
+          <span id="loginSpinner" class="spinner" style="display: none;"></span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Main App -->
+  <div id="mainApp" style="display: none;">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="logo">
+        <span class="logo-icon">✦</span>
+        <span>Aethera Admin</span>
+      </div>
+      
+      <div class="header-right">
+        <div class="user-info">
+          <span>Logged in as</span>
+          <span class="username" id="currentUser">-</span>
+          <button class="btn-ghost" onclick="logout()">Logout</button>
+        </div>
+      </div>
+    </header>
+    
+    <!-- Navigation -->
+    <nav class="nav-tabs">
+      <button class="nav-tab active" data-page="dashboard">📊 Dashboard</button>
+      <button class="nav-tab" data-page="bots">🤖 Bots</button>
+      <button class="nav-tab" data-page="services">⚙️ Services</button>
+      <button class="nav-tab" data-page="dreams">🎨 Dreams</button>
+      <button class="nav-tab" data-page="blog">📝 Blog</button>
+      <button class="nav-tab" data-page="irc">💬 IRC</button>
+      <button class="nav-tab" data-page="settings">🔧 Settings</button>
+    </nav>
+    
+    <!-- Dashboard Page -->
+    <div id="page-dashboard" class="page-content active">
+      <div class="page-header">
+        <h1 class="page-title">Dashboard</h1>
+        <p class="page-subtitle">Overview of all services and bots</p>
+      </div>
+      
+      <div class="stats-grid">
+        <div class="stat-card">
+          <span class="stat-label">Services</span>
+          <span class="stat-value" id="statServices">-</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Bots Running</span>
+          <span class="stat-value success" id="statBotsRunning">-</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Dreams Status</span>
+          <span class="stat-value" id="statDreams">-</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Blog Posts</span>
+          <span class="stat-value" id="statBlogPosts">-</span>
+        </div>
+      </div>
+      
+      <div class="grid grid-2">
+        <!-- Services Overview -->
+        <div class="card">
+          <h3 style="margin-bottom: var(--space-md);">Services</h3>
+          <div id="dashboardServices">
+            <div class="empty-state">
+              <div class="spinner"></div>
+              <p style="margin-top: var(--space-md);">Loading services...</p>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Bots Overview -->
+        <div class="card">
+          <h3 style="margin-bottom: var(--space-md);">ChapterX Bots</h3>
+          <div id="dashboardBots">
+            <div class="empty-state">
+              <div class="spinner"></div>
+              <p style="margin-top: var(--space-md);">Loading bots...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Bots Page -->
+    <div id="page-bots" class="page-content">
+      <div class="page-header">
+        <h1 class="page-title">ChapterX Bots</h1>
+        <p class="page-subtitle">Manage Discord bots via systemd services</p>
+      </div>
+      
+      <!-- Deployment Slots Info -->
+      <div id="slotsInfo" class="slots-info">
+        <!-- Populated by JS -->
+      </div>
+      
+      <!-- Toolbar -->
+      <div class="bots-toolbar">
+        <div class="bots-stats">
+          <span class="bots-stat">Total: <span id="botsTotal" class="value">0</span></span>
+          <span class="bots-stat">Running: <span id="botsRunning" class="value success">0</span></span>
+        </div>
+        <button class="btn-secondary" onclick="refreshBots()">
+          🔄 Refresh
+        </button>
+      </div>
+      
+      <!-- Bots Grid -->
+      <div id="botsGrid" class="bots-grid">
+        <!-- Bot cards populated by JS -->
+      </div>
+    </div>
+    
+    <!-- Logs Modal -->
+    <div id="logsModal" class="modal-overlay logs-modal" onclick="closeLogsModal(event)">
+      <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-header">
+          <span class="modal-title">
+            <span id="logsModalTitle">Bot Logs</span>
+          </span>
+          <button class="modal-close" onclick="closeLogsModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="logs-controls">
+            <button class="btn-secondary" onclick="refreshLogs()">🔄 Refresh</button>
+            <button class="btn-ghost" onclick="scrollLogsToBottom()">⬇️ Scroll to bottom</button>
+          </div>
+          <pre id="logsOutput" class="logs-output">[Loading...]</pre>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Config Modal -->
+    <div id="configModal" class="modal-overlay" onclick="closeConfigModal(event)">
+      <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-header">
+          <span class="modal-title">
+            <span id="configModalTitle">Bot Configuration</span>
+          </span>
+          <button class="modal-close" onclick="closeConfigModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <textarea id="configEditor" class="config-editor" spellcheck="false"></textarea>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" onclick="closeConfigModal()">Cancel</button>
+          <button class="btn-primary" onclick="saveConfig()">Save Config</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Services Page -->
+    <div id="page-services" class="page-content">
+      <div class="page-header">
+        <h1 class="page-title">Services</h1>
+        <p class="page-subtitle">Manage aethera and ChapterX deployment slots</p>
+      </div>
+      
+      <!-- Docker Warning (if unavailable) -->
+      <div id="dockerWarning" class="docker-unavailable" style="display: none;">
+        <span>⚠️</span>
+        <span>Docker not available - aethera container management disabled</span>
+      </div>
+      
+      <!-- Aethera Section -->
+      <div class="services-section">
+        <h2 class="services-section-title">🌐 Aethera (Blog Platform)</h2>
+        <div id="aetheraCard" class="service-card">
+          <div class="service-card-header">
+            <div class="service-card-info">
+              <div class="service-card-name">
+                aethera
+                <span class="service-card-type">Docker</span>
+              </div>
+              <div class="service-card-description">Blog platform with dreams viewer, IRC viewer, comments</div>
+            </div>
+            <div class="service-card-status">
+              <span id="aetheraStatusBadge" class="service-status-badge stopped">
+                <span class="status-dot stopped"></span>
+                Loading...
+              </span>
+              <span id="aetheraHealthBadge" class="service-health-badge">—</span>
+            </div>
+          </div>
+          
+          <div id="aetheraStats" class="service-stats">
+            <div class="service-stat">
+              <span class="service-stat-label">Container</span>
+              <span class="service-stat-value" id="aetheraContainer">—</span>
+            </div>
+            <div class="service-stat">
+              <span class="service-stat-label">Image</span>
+              <span class="service-stat-value" id="aetheraImage">—</span>
+            </div>
+            <div class="service-stat">
+              <span class="service-stat-label">Uptime</span>
+              <span class="service-stat-value" id="aetheraUptime">—</span>
+            </div>
+            <div class="service-stat">
+              <span class="service-stat-label">Restarts</span>
+              <span class="service-stat-value" id="aetheraRestarts">—</span>
+            </div>
+          </div>
+          
+          <div class="service-actions">
+            <button id="aetheraStartBtn" class="btn-primary" onclick="startAethera()" style="display: none;">▶️ Start</button>
+            <button id="aetheraStopBtn" class="btn-secondary" onclick="stopAethera()" style="display: none;">⏹️ Stop</button>
+            <button id="aetheraRestartBtn" class="btn-secondary" onclick="restartAethera()">🔄 Restart</button>
+            <button class="btn-secondary" onclick="viewAetheraLogs()">📜 View Logs</button>
+            <button class="btn-ghost" onclick="refreshAetheraStatus()">🔄 Refresh</button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- ChapterX Slots Section -->
+      <div class="services-section">
+        <h2 class="services-section-title">📦 ChapterX Deployment Slots</h2>
+        <p style="color: var(--text-secondary); font-size: var(--text-sm); margin-bottom: var(--space-md);">
+          Manage git operations for ChapterX code. Running bots will be affected by code changes.
+        </p>
+        <div id="slotsGrid" class="slots-grid">
+          <!-- Populated by JS -->
+          <div class="empty-state" style="grid-column: 1 / -1;">
+            <div class="spinner"></div>
+            <p style="margin-top: var(--space-md);">Loading slots...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Aethera Logs Modal -->
+    <div id="aetheraLogsModal" class="modal-overlay logs-modal" onclick="closeAetheraLogsModal(event)">
+      <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-header">
+          <span class="modal-title">Aethera Logs</span>
+          <button class="modal-close" onclick="closeAetheraLogsModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="logs-controls">
+            <button class="btn-secondary" onclick="refreshAetheraLogs()">🔄 Refresh</button>
+            <button class="btn-ghost" onclick="scrollAetheraLogsToBottom()">⬇️ Scroll to bottom</button>
+          </div>
+          <pre id="aetheraLogsOutput" class="logs-output">[Loading...]</pre>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Dreams Page -->
+    <div id="page-dreams" class="page-content">
+      <div class="page-header">
+        <h1 class="page-title">Dreams</h1>
+        <p class="page-subtitle">Control RunPod GPU and view Dream Window status</p>
+      </div>
+      
+      <!-- Config Warning (if not configured) -->
+      <div id="dreamsConfigWarning" class="config-warning" style="display: none;">
+        <span class="config-warning-icon">⚠️</span>
+        <div class="config-warning-content">
+          <div class="config-warning-title">RunPod Not Configured</div>
+          <div class="config-warning-text">
+            Set <code>RUNPOD_API_KEY</code> and <code>RUNPOD_ENDPOINT_ID</code> in your .env file to enable GPU control.
+          </div>
+        </div>
+      </div>
+      
+      <!-- GPU Control Card -->
+      <div class="gpu-card">
+        <div class="gpu-card-header">
+          <div class="gpu-card-title">
+            <span class="emoji">🎨</span>
+            <div>
+              <h3>Dream Window GPU</h3>
+              <div class="gpu-card-subtitle">RunPod Serverless • GPU-accelerated AI art generation</div>
+            </div>
+          </div>
+          <div id="gpuStateBadge" class="gpu-state-badge idle">
+            <span class="status-dot"></span>
+            <span id="gpuStateText">Idle</span>
+          </div>
+        </div>
+        
+        <div class="gpu-card-body">
+          <!-- Status Message -->
+          <div id="gpuStatusMessage" class="gpu-status-message" style="display: none;">
+            <span id="gpuStatusIcon">⏳</span>
+            <span id="gpuStatusText">Loading...</span>
+          </div>
+          
+          <!-- Cost Display -->
+          <div class="gpu-cost-display">
+            <div class="gpu-cost-info">
+              <span class="gpu-cost-label">Session Cost (Est.)</span>
+              <span class="gpu-cost-value" id="gpuCost">$0.00</span>
+            </div>
+            <div class="gpu-cost-rate">
+              <div>Rate: $<span id="gpuRate">0.19</span>/hr</div>
+              <div>Uptime: <span id="gpuUptime">0s</span></div>
+            </div>
+          </div>
+          
+          <!-- GPU Stats Grid -->
+          <div class="gpu-stats">
+            <div class="gpu-stat">
+              <span class="gpu-stat-label">State</span>
+              <span class="gpu-stat-value" id="gpuStateValue">—</span>
+            </div>
+            <div class="gpu-stat">
+              <span class="gpu-stat-label">Viewers</span>
+              <span class="gpu-stat-value" id="gpuViewers">—</span>
+            </div>
+            <div class="gpu-stat">
+              <span class="gpu-stat-label">Frames</span>
+              <span class="gpu-stat-value" id="gpuFrames">—</span>
+            </div>
+            <div class="gpu-stat">
+              <span class="gpu-stat-label">FPS</span>
+              <span class="gpu-stat-value" id="gpuFps">—</span>
+            </div>
+          </div>
+          
+          <!-- Aethera Info Panel -->
+          <div class="aethera-info">
+            <div class="aethera-info-title">
+              <span>🌐</span>
+              <span>Aethera (VPS) Status</span>
+            </div>
+            <div id="aetheraInfoGrid" class="aethera-info-grid">
+              <div class="gpu-stat">
+                <span class="gpu-stat-label">Connection</span>
+                <span class="gpu-stat-value" id="aetheraConnection">—</span>
+              </div>
+              <div class="gpu-stat">
+                <span class="gpu-stat-label">GPU Active</span>
+                <span class="gpu-stat-value" id="aetheraGpuActive">—</span>
+              </div>
+              <div class="gpu-stat">
+                <span class="gpu-stat-label">WS Viewers</span>
+                <span class="gpu-stat-value" id="aetheraWsViewers">—</span>
+              </div>
+              <div class="gpu-stat">
+                <span class="gpu-stat-label">API Active</span>
+                <span class="gpu-stat-value" id="aetheraApiActive">—</span>
+              </div>
+            </div>
+          </div>
+          
+          <!-- RunPod Info Panel -->
+          <div class="runpod-info">
+            <div class="runpod-info-title">
+              <span>☁️</span>
+              <span>RunPod Endpoint Status</span>
+            </div>
+            <div id="runpodInfoGrid" class="runpod-info-grid">
+              <div class="runpod-stat">
+                <span class="runpod-stat-label">Workers</span>
+                <span class="runpod-stat-value" id="runpodWorkers">—</span>
+              </div>
+              <div class="runpod-stat">
+                <span class="runpod-stat-label">Running</span>
+                <span class="runpod-stat-value" id="runpodRunning">—</span>
+              </div>
+              <div class="runpod-stat">
+                <span class="runpod-stat-label">In Queue</span>
+                <span class="runpod-stat-value" id="runpodQueued">—</span>
+              </div>
+              <div class="runpod-stat">
+                <span class="runpod-stat-label">Completed</span>
+                <span class="runpod-stat-value" id="runpodCompleted">—</span>
+              </div>
+            </div>
+          </div>
+          
+          <!-- GPU Actions -->
+          <div class="gpu-actions">
+            <button id="gpuStartBtn" class="btn btn-start" onclick="startGpu()">
+              ▶️ Start GPU
+            </button>
+            <button id="gpuStopBtn" class="btn btn-stop" onclick="stopGpu()">
+              ⏹️ Stop GPU
+            </button>
+            <button id="gpuRestartBtn" class="btn btn-restart" onclick="restartGpu()">
+              🔄 Restart
+            </button>
+            <button class="btn btn-secondary" onclick="refreshDreamsStatus()">
+              🔄 Refresh Status
+            </button>
+          </div>
+          
+          <!-- Quick Links -->
+          <div class="dreams-quick-links">
+            <a href="#" class="quick-link" onclick="openDreamsViewer(event)">
+              <span class="quick-link-icon">🖼️</span>
+              <span>Open Dreams Viewer</span>
+            </a>
+            <a href="#" class="quick-link" onclick="openRunpodDashboard(event)">
+              <span class="quick-link-icon">☁️</span>
+              <span>RunPod Dashboard</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Blog Page -->
+    <div id="page-blog" class="page-content">
+      <div class="page-header">
+        <h1 class="page-title">Blog</h1>
+        <p class="page-subtitle">Manage blog posts and drafts</p>
+      </div>
+      
+      <!-- Database Warning (if unavailable) -->
+      <div id="blogDbWarning" class="config-warning" style="display: none;">
+        <span class="config-warning-icon">⚠️</span>
+        <div class="config-warning-content">
+          <div class="config-warning-title">Database Not Accessible</div>
+          <div class="config-warning-text">
+            Cannot connect to the blog database. Make sure aethera core is configured correctly.
+          </div>
+        </div>
+      </div>
+      
+      <!-- Toolbar -->
+      <div class="blog-toolbar">
+        <div class="blog-toolbar-left">
+          <div class="blog-filter-tabs">
+            <button class="blog-filter-tab active" data-filter="all">All</button>
+            <button class="blog-filter-tab" data-filter="published">Published</button>
+            <button class="blog-filter-tab" data-filter="drafts">Drafts</button>
+          </div>
+          <div class="blog-stats">
+            <span class="blog-stat">Total: <span id="blogTotal" class="value">0</span></span>
+            <span class="blog-stat">Published: <span id="blogPublished" class="value success">0</span></span>
+            <span class="blog-stat">Drafts: <span id="blogDrafts" class="value draft">0</span></span>
+          </div>
+        </div>
+        <div class="blog-toolbar-right">
+          <button class="btn-secondary" onclick="refreshBlogPosts()">🔄 Refresh</button>
+          <button class="btn-primary" onclick="openPostEditor()">+ New Post</button>
+        </div>
+      </div>
+      
+      <!-- Posts Table -->
+      <div id="postsTableContainer" class="posts-table-container">
+        <table class="posts-table">
+          <thead>
+            <tr>
+              <th>Title</th>
+              <th>Status</th>
+              <th>Updated</th>
+              <th>Author</th>
+              <th>Tags</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="postsTableBody">
+            <!-- Posts populated by JS -->
+          </tbody>
+        </table>
+      </div>
+      
+      <!-- Empty State (when no posts) -->
+      <div id="blogEmptyState" class="blog-empty-state" style="display: none;">
+        <div class="blog-empty-state-icon">📝</div>
+        <p class="blog-empty-state-title">No posts yet</p>
+        <p class="blog-empty-state-description">Create your first blog post to get started.</p>
+        <button class="btn-primary" onclick="openPostEditor()">+ Create Post</button>
+      </div>
+      
+      <!-- Loading State -->
+      <div id="postsLoading" class="posts-loading" style="display: none;">
+        <div class="spinner"></div>
+        <span>Loading posts...</span>
+      </div>
+      
+      <!-- Pagination -->
+      <div id="blogPagination" class="blog-pagination" style="display: none;">
+        <span class="pagination-info">
+          Showing <span id="paginationStart">1</span>-<span id="paginationEnd">10</span> of <span id="paginationTotal">0</span>
+        </span>
+        <div class="pagination-buttons">
+          <button id="prevPageBtn" class="pagination-btn" onclick="loadBlogPage(currentBlogPage - 1)" disabled>← Previous</button>
+          <button id="nextPageBtn" class="pagination-btn" onclick="loadBlogPage(currentBlogPage + 1)">Next →</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Post Editor Modal -->
+    <div id="postEditorModal" class="modal-overlay editor-modal" onclick="closePostEditor(event)">
+      <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-header">
+          <span class="modal-title">
+            <span id="postEditorTitle">New Post</span>
+          </span>
+          <button class="modal-close" onclick="closePostEditor()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <!-- Title Field -->
+          <div class="form-group">
+            <label class="form-label" for="postTitleInput">Title</label>
+            <input type="text" id="postTitleInput" class="form-input" placeholder="Enter post title...">
+          </div>
+          
+          <!-- Editor Layout -->
+          <div class="editor-layout">
+            <!-- Editor Pane -->
+            <div class="editor-pane">
+              <div class="editor-pane-header">
+                <span class="editor-pane-title">Markdown</span>
+              </div>
+              <textarea id="postContentEditor" class="markdown-editor" placeholder="Write your post content in Markdown..."></textarea>
+            </div>
+            
+            <!-- Preview Pane -->
+            <div class="preview-pane">
+              <div class="editor-pane-header">
+                <span class="editor-pane-title">Preview</span>
+                <button class="btn-ghost" onclick="refreshPreview()">🔄</button>
+              </div>
+              <div id="postPreviewContent" class="preview-content">
+                <p style="color: var(--text-muted); font-style: italic;">Preview will appear here...</p>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Metadata Fields -->
+          <div class="editor-metadata">
+            <div class="metadata-field">
+              <label for="postAuthorInput">Author</label>
+              <input type="text" id="postAuthorInput" value="luxia">
+            </div>
+            <div class="metadata-field">
+              <label for="postTagsInput">Tags</label>
+              <input type="text" id="postTagsInput" placeholder="comma, separated, tags">
+            </div>
+            <div class="metadata-field">
+              <label for="postCategoriesInput">Categories</label>
+              <input type="text" id="postCategoriesInput" placeholder="comma, separated">
+            </div>
+            <div class="metadata-field">
+              <label for="postLicenseInput">License</label>
+              <select id="postLicenseInput">
+                <option value="CC BY 4.0">CC BY 4.0</option>
+                <option value="CC BY-SA 4.0">CC BY-SA 4.0</option>
+                <option value="CC BY-NC 4.0">CC BY-NC 4.0</option>
+                <option value="All Rights Reserved">All Rights Reserved</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <div class="editor-footer-left">
+            <div class="publish-toggle">
+              <label>Published</label>
+              <div id="postPublishToggle" class="toggle-switch" onclick="togglePublishState()"></div>
+            </div>
+          </div>
+          <div class="editor-footer-right">
+            <button class="btn-secondary" onclick="closePostEditor()">Cancel</button>
+            <button class="btn-primary" id="savePostBtn" onclick="savePost()">Save Post</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Delete Confirmation Modal -->
+    <div id="deletePostModal" class="modal-overlay delete-confirm-modal" onclick="closeDeleteModal(event)">
+      <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-header">
+          <span class="modal-title">Delete Post</span>
+          <button class="modal-close" onclick="closeDeleteModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="delete-confirm-content">
+            <div class="delete-confirm-icon">🗑️</div>
+            <h3 class="delete-confirm-title">Are you sure?</h3>
+            <p class="delete-confirm-text">
+              This will permanently delete <span id="deletePostTitle" class="delete-confirm-post-title"></span> and all its comments.
+            </p>
+            <div class="delete-confirm-actions">
+              <button class="btn-secondary" onclick="closeDeleteModal()">Cancel</button>
+              <button class="btn-danger" onclick="confirmDeletePostAction()">Delete Post</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- IRC Page (placeholder) -->
+    <div id="page-irc" class="page-content">
+      <div class="page-header">
+        <h1 class="page-title">IRC Fragments</h1>
+        <p class="page-subtitle">Review and approve generated IRC fragments</p>
+      </div>
+      <div class="empty-state">
+        <div class="empty-state-icon">💬</div>
+        <p class="empty-state-title">Coming Soon</p>
+        <p class="empty-state-description">IRC review will be implemented in Phase 6</p>
+      </div>
+    </div>
+    
+    <!-- Settings Page -->
+    <div id="page-settings" class="page-content">
+      <div class="page-header">
+        <h1 class="page-title">Settings</h1>
+        <p class="page-subtitle">Account and configuration settings</p>
+      </div>
+      
+      <div class="card" style="max-width: 500px;">
+        <h3 style="margin-bottom: var(--space-md);">Change Password</h3>
+        <form id="changePasswordForm">
+          <div class="form-group">
+            <label class="form-label" for="currentPassword">Current Password</label>
+            <input type="password" id="currentPassword" class="form-input" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="newPassword">New Password</label>
+            <input type="password" id="newPassword" class="form-input" required minlength="8">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="confirmPassword">Confirm New Password</label>
+            <input type="password" id="confirmPassword" class="form-input" required>
+          </div>
+          <button type="submit" class="btn-primary">Change Password</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <!-- Scripts -->
+  <script src="/js/api.js"></script>
+  <script src="/js/main.js"></script>
+</body>
+</html>
+

@@ -1,0 +1,25 @@
+{
+  "name": "aethera-admin",
+  "version": "0.1.0",
+  "description": "Personal admin panel for aethera services",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "keywords": [
+    "admin",
+    "aethera",
+    "chapterx",
+    "dreams"
+  ],
+  "author": "luxia",
+  "license": "MIT",
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "better-sqlite3": "^11.7.0",
+    "cookie-parser": "^1.4.7",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1"
+  }
+}

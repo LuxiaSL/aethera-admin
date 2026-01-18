@@ -1,0 +1,452 @@
+/* ==========================================================================
+   Dreams Page Styles
+   Extends service card patterns with dreams-specific components
+   ========================================================================== */
+
+/* ==========================================================================
+   GPU Status Card
+   ========================================================================== */
+
+.gpu-card {
+  background: var(--surface-elevated);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-subtle);
+  overflow: hidden;
+  transition: border-color 0.2s ease;
+}
+
+.gpu-card:hover {
+  border-color: var(--border-default);
+}
+
+.gpu-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-lg);
+  background: linear-gradient(135deg, 
+    rgba(139, 92, 246, 0.1) 0%, 
+    rgba(59, 130, 246, 0.05) 100%
+  );
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.gpu-card-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.gpu-card-title h3 {
+  font-size: var(--text-xl);
+  font-weight: 600;
+  margin: 0;
+}
+
+.gpu-card-title .emoji {
+  font-size: 1.5em;
+}
+
+.gpu-card-subtitle {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  margin-top: var(--space-xs);
+}
+
+/* GPU State Badge */
+.gpu-state-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-full);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.gpu-state-badge.running {
+  background: rgba(16, 185, 129, 0.2);
+  color: var(--status-success);
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.3);
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.gpu-state-badge.starting {
+  background: rgba(251, 191, 36, 0.2);
+  color: var(--status-warning);
+  animation: pulse-glow 1s ease-in-out infinite;
+}
+
+.gpu-state-badge.idle {
+  background: rgba(107, 114, 128, 0.2);
+  color: var(--text-muted);
+}
+
+.gpu-state-badge.not_configured {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--status-error);
+}
+
+.gpu-state-badge.unknown {
+  background: rgba(107, 114, 128, 0.15);
+  color: var(--text-muted);
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* GPU Card Body */
+.gpu-card-body {
+  padding: var(--space-lg);
+}
+
+/* ==========================================================================
+   GPU Stats Grid
+   ========================================================================== */
+
+.gpu-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+  padding: var(--space-md);
+  background: var(--surface-default);
+  border-radius: var(--radius-md);
+}
+
+.gpu-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.gpu-stat-label {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.gpu-stat-value {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  font-family: var(--font-mono);
+}
+
+.gpu-stat-value.highlight {
+  color: var(--accent-primary);
+}
+
+.gpu-stat-value.success {
+  color: var(--status-success);
+}
+
+.gpu-stat-value.warning {
+  color: var(--status-warning);
+}
+
+.gpu-stat-value.muted {
+  color: var(--text-muted);
+}
+
+/* ==========================================================================
+   Cost Display
+   ========================================================================== */
+
+.gpu-cost-display {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-md);
+  background: linear-gradient(90deg, 
+    rgba(16, 185, 129, 0.1) 0%, 
+    rgba(16, 185, 129, 0.05) 100%
+  );
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-lg);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.gpu-cost-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.gpu-cost-label {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.gpu-cost-value {
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--status-success);
+}
+
+.gpu-cost-rate {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  text-align: right;
+}
+
+/* ==========================================================================
+   GPU Actions
+   ========================================================================== */
+
+.gpu-actions {
+  display: flex;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.gpu-actions .btn {
+  flex: 1;
+  min-width: 120px;
+  justify-content: center;
+}
+
+.btn-start {
+  background: var(--status-success);
+  color: white;
+}
+
+.btn-start:hover:not(:disabled) {
+  background: #059669;
+}
+
+.btn-stop {
+  background: var(--status-error);
+  color: white;
+}
+
+.btn-stop:hover:not(:disabled) {
+  background: #dc2626;
+}
+
+.btn-restart {
+  background: var(--status-warning);
+  color: white;
+}
+
+.btn-restart:hover:not(:disabled) {
+  background: #d97706;
+}
+
+/* ==========================================================================
+   Status Message
+   ========================================================================== */
+
+.gpu-status-message {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  background: var(--surface-default);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-lg);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.gpu-status-message.starting {
+  background: rgba(251, 191, 36, 0.1);
+  color: var(--status-warning);
+  border: 1px solid rgba(251, 191, 36, 0.2);
+}
+
+.gpu-status-message.error {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--status-error);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+/* ==========================================================================
+   RunPod Info Panel
+   ========================================================================== */
+
+.runpod-info {
+  background: var(--surface-default);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  margin-bottom: var(--space-lg);
+}
+
+.runpod-info-title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  margin-bottom: var(--space-sm);
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.runpod-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: var(--space-md);
+}
+
+.runpod-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.runpod-stat-label {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.runpod-stat-value {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  font-family: var(--font-mono);
+}
+
+/* ==========================================================================
+   Aethera/VPS Info Panel
+   ========================================================================== */
+
+.aethera-info {
+  background: var(--surface-default);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  margin-bottom: var(--space-lg);
+}
+
+.aethera-info-title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  margin-bottom: var(--space-sm);
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.aethera-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--space-md);
+}
+
+/* ==========================================================================
+   Config Warning
+   ========================================================================== */
+
+.config-warning {
+  background: rgba(251, 191, 36, 0.1);
+  border: 1px solid var(--status-warning);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  margin-bottom: var(--space-lg);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  color: var(--text-primary);
+}
+
+.config-warning-icon {
+  color: var(--status-warning);
+  font-size: 1.25em;
+  flex-shrink: 0;
+}
+
+.config-warning-content {
+  flex: 1;
+}
+
+.config-warning-title {
+  font-weight: 600;
+  margin-bottom: var(--space-xs);
+}
+
+.config-warning-text {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.config-warning-text code {
+  background: rgba(0, 0, 0, 0.2);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+/* ==========================================================================
+   Quick Links
+   ========================================================================== */
+
+.dreams-quick-links {
+  display: flex;
+  gap: var(--space-md);
+  margin-top: var(--space-lg);
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.quick-link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--text-sm);
+  color: var(--accent-primary);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.quick-link:hover {
+  color: var(--accent-secondary);
+}
+
+.quick-link-icon {
+  font-size: 1.1em;
+}
+
+/* ==========================================================================
+   Responsive
+   ========================================================================== */
+
+@media (max-width: 768px) {
+  .gpu-card-header {
+    flex-direction: column;
+    gap: var(--space-md);
+    align-items: flex-start;
+  }
+  
+  .gpu-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .gpu-cost-display {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-md);
+  }
+  
+  .gpu-cost-rate {
+    text-align: left;
+  }
+  
+  .gpu-actions {
+    flex-direction: column;
+  }
+  
+  .gpu-actions .btn {
+    width: 100%;
+  }
+  
+  .dreams-quick-links {
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+}
+

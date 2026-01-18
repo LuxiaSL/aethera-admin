@@ -1,0 +1,373 @@
+/* ==========================================================================
+   Services Page Styles
+   ========================================================================== */
+
+/* Services Grid */
+.services-section {
+  margin-bottom: var(--space-xl);
+}
+
+.services-section-title {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  margin-bottom: var(--space-md);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+/* Service Card */
+.service-card {
+  background: var(--surface-elevated);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-subtle);
+  padding: var(--space-lg);
+  transition: border-color 0.2s ease;
+}
+
+.service-card:hover {
+  border-color: var(--border-default);
+}
+
+.service-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--space-md);
+}
+
+.service-card-info {
+  flex: 1;
+}
+
+.service-card-name {
+  font-size: var(--text-xl);
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.service-card-type {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: var(--surface-default);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  margin-left: var(--space-sm);
+}
+
+.service-card-description {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  margin-top: var(--space-xs);
+}
+
+.service-card-status {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-xs);
+}
+
+.service-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-full);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.service-status-badge.running {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--status-success);
+}
+
+.service-status-badge.stopped {
+  background: rgba(107, 114, 128, 0.15);
+  color: var(--text-muted);
+}
+
+.service-status-badge.unhealthy {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--status-error);
+}
+
+.service-health-badge {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.service-health-badge.healthy {
+  color: var(--status-success);
+}
+
+.service-health-badge.unhealthy {
+  color: var(--status-error);
+}
+
+/* Service Stats */
+.service-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+  padding: var(--space-md);
+  background: var(--surface-default);
+  border-radius: var(--radius-md);
+}
+
+.service-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.service-stat-label {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.service-stat-value {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  font-family: var(--font-mono);
+}
+
+/* Service Actions */
+.service-actions {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+/* ==========================================================================
+   Slot Cards
+   ========================================================================== */
+
+.slots-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: var(--space-lg);
+}
+
+.slot-card-full {
+  background: var(--surface-elevated);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-subtle);
+  overflow: hidden;
+}
+
+.slot-card-full:hover {
+  border-color: var(--border-default);
+}
+
+.slot-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-md) var(--space-lg);
+  background: var(--surface-default);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.slot-card-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.slot-name-badge {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.slot-name-badge.main {
+  color: var(--status-success);
+}
+
+.slot-name-badge.dev {
+  color: var(--status-warning);
+}
+
+.slot-exists-badge {
+  font-size: var(--text-xs);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+}
+
+.slot-exists-badge.exists {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--status-success);
+}
+
+.slot-exists-badge.missing {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--status-error);
+}
+
+.slot-card-body {
+  padding: var(--space-lg);
+}
+
+/* Git Info */
+.slot-git-info {
+  margin-bottom: var(--space-md);
+}
+
+.slot-git-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-xs);
+}
+
+.slot-git-label {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  min-width: 80px;
+}
+
+.slot-git-value {
+  font-size: var(--text-sm);
+  font-family: var(--font-mono);
+}
+
+.slot-git-value.branch {
+  color: var(--accent-primary);
+  font-weight: 500;
+}
+
+.slot-git-value.commit {
+  color: var(--text-secondary);
+}
+
+.slot-git-value.dirty {
+  color: var(--status-warning);
+}
+
+.slot-git-value.behind {
+  color: var(--status-error);
+}
+
+.slot-git-value.ahead {
+  color: var(--accent-primary);
+}
+
+.slot-commit-message {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  font-style: italic;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 300px;
+}
+
+/* Slot Actions */
+.slot-actions {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* Branch Selector */
+.branch-selector {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.branch-selector select {
+  background: var(--surface-default);
+  color: var(--text-primary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: var(--space-xs) var(--space-sm);
+  font-size: var(--text-sm);
+  font-family: var(--font-mono);
+  cursor: pointer;
+}
+
+.branch-selector select:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+}
+
+/* Running Bots */
+.slot-running-bots {
+  margin-top: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--surface-default);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+}
+
+.slot-running-bots-label {
+  color: var(--text-muted);
+  margin-right: var(--space-sm);
+}
+
+.slot-running-bots-list {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+/* ==========================================================================
+   Docker Status Indicator
+   ========================================================================== */
+
+.docker-unavailable {
+  background: rgba(251, 191, 36, 0.1);
+  border: 1px solid var(--status-warning);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  margin-bottom: var(--space-lg);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  color: var(--status-warning);
+}
+
+/* ==========================================================================
+   Responsive
+   ========================================================================== */
+
+@media (max-width: 768px) {
+  .slots-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .service-card-header {
+    flex-direction: column;
+    gap: var(--space-md);
+  }
+  
+  .service-card-status {
+    align-items: flex-start;
+  }
+  
+  .slot-actions {
+    flex-direction: column;
+  }
+  
+  .slot-actions .btn-secondary,
+  .slot-actions .btn-primary {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+

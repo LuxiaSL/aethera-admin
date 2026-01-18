@@ -1,0 +1,108 @@
+/* login.css - Login page styles */
+
+.login-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-lg);
+  background: 
+    radial-gradient(ellipse at 20% 80%, rgba(124, 92, 191, 0.15) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, rgba(74, 158, 255, 0.1) 0%, transparent 50%),
+    var(--bg-primary);
+}
+
+.login-box {
+  width: 100%;
+  max-width: 400px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xl);
+  padding: var(--space-2xl);
+  box-shadow: var(--shadow-lg);
+  animation: slideUp var(--transition-slow);
+}
+
+.login-header {
+  text-align: center;
+  margin-bottom: var(--space-xl);
+}
+
+.login-logo {
+  font-size: 3rem;
+  margin-bottom: var(--space-md);
+}
+
+.login-title {
+  font-size: var(--text-2xl);
+  font-weight: 600;
+  margin-bottom: var(--space-xs);
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.login-subtitle {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.login-form .form-group {
+  margin-bottom: 0;
+}
+
+.login-form input {
+  width: 100%;
+  padding: var(--space-md);
+}
+
+.login-form button[type="submit"] {
+  width: 100%;
+  padding: var(--space-md);
+  margin-top: var(--space-sm);
+  font-size: var(--text-base);
+}
+
+.login-error {
+  background: rgba(248, 113, 113, 0.1);
+  border: 1px solid var(--status-error);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  color: var(--status-error);
+  font-size: var(--text-sm);
+  text-align: center;
+  animation: shake 0.5s ease;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-5px); }
+  40%, 80% { transform: translateX(5px); }
+}
+
+.password-wrapper {
+  position: relative;
+}
+
+.password-toggle {
+  position: absolute;
+  right: var(--space-sm);
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  color: var(--text-muted);
+  padding: var(--space-xs);
+  font-size: var(--text-lg);
+}
+
+.password-toggle:hover {
+  color: var(--text-primary);
+}
+
