@@ -215,6 +215,60 @@ router.post('/:slot/npm-install', async (req, res) => {
   }
 });
 
+// ============================================================================
+// GIT DEPENDENCIES
+// ============================================================================
+
+/**
+ * GET /api/slots/:slot/deps
+ * Get git dependencies status for a slot (current vs latest commits)
+ */
+router.get('/:slot/deps', async (req, res) => {
+  try {
+    const { slot } = req.params;
+    
+    const status = await chapterx.getGitDepsStatus(slot);
+    
+    res.json(status);
+  } catch (error) {
+    console.error('Error getting git deps status:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/slots/:slot/update-deps
+ * Update git dependencies to latest commits
+ */
+router.post('/:slot/update-deps', async (req, res) => {
+  try {
+    const { slot } = req.params;
+    const { package: packageName = 'all', autoRestart = false } = req.body;
+    
+    console.log(`Updating git dependencies for slot '${slot}' (package: ${packageName})...`);
+    const result = await chapterx.updateGitDep(slot, packageName);
+    
+    // Auto-restart bots if requested and update was successful
+    let restartResults = null;
+    if (result.success && !result.skipped && autoRestart) {
+      console.log(`Dependencies updated, restarting bots on slot '${slot}'...`);
+      restartResults = await chapterx.restartBotsOnSlot(slot);
+    }
+    
+    // Get updated slot status
+    const status = await chapterx.getSlotGitStatus(slot);
+    
+    res.json({
+      ...result,
+      status,
+      restartResults,
+    });
+  } catch (error) {
+    console.error('Error updating git deps:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
 
 

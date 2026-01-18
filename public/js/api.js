@@ -225,6 +225,29 @@ const api = {
     async discard(slot) {
       return api.request(`/slots/${slot}/discard`, { method: 'POST' });
     },
+    
+    /**
+     * Get git dependencies status for a slot
+     * @param {string} slot - Slot name
+     * @returns {Promise<Object>} Dependencies with current/latest commits
+     */
+    async depsStatus(slot) {
+      return api.request(`/slots/${slot}/deps`);
+    },
+    
+    /**
+     * Update git dependencies for a slot
+     * @param {string} slot - Slot name
+     * @param {Object} options - Update options
+     * @param {string} options.package - Package name or 'all'
+     * @param {boolean} options.autoRestart - Restart bots after update
+     */
+    async updateDeps(slot, { package: packageName = 'all', autoRestart = false } = {}) {
+      return api.request(`/slots/${slot}/update-deps`, {
+        method: 'POST',
+        body: { package: packageName, autoRestart },
+      });
+    },
   },
   
   // ============================================================================

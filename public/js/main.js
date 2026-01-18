@@ -953,14 +953,132 @@ function closeAetheraLogsModal(event) {
 // Note: currentSlots is already declared in BOT MANAGEMENT section
 // and shared between bots page and services page for slot info
 
+// Store git deps status per slot
+let slotGitDeps = {};
+
 async function loadSlots() {
   try {
     const data = await api.slots.list();
     currentSlots = data.slots || {};
     renderSlots();
+    
+    // Load git deps status for each slot (async, will update UI when ready)
+    for (const slotName of Object.keys(currentSlots)) {
+      loadSlotDeps(slotName);
+    }
   } catch (error) {
     console.error('Error loading slots:', error);
     showToast('Failed to load slots', 'error');
+  }
+}
+
+/**
+ * Load git dependencies status for a slot
+ */
+async function loadSlotDeps(slot) {
+  try {
+    const status = await api.slots.depsStatus(slot);
+    slotGitDeps[slot] = status;
+    updateSlotDepsUI(slot);
+  } catch (error) {
+    console.error(`Error loading deps for ${slot}:`, error);
+  }
+}
+
+/**
+ * Update the deps section in a slot card
+ */
+function updateSlotDepsUI(slot) {
+  const container = document.getElementById(`slotDeps-${slot}`);
+  if (!container) return;
+  
+  const deps = slotGitDeps[slot];
+  if (!deps || !deps.hasGitDeps) {
+    container.innerHTML = '';
+    return;
+  }
+  
+  const needsUpdate = deps.needsUpdate;
+  const depsHtml = deps.dependencies.map(dep => {
+    const shortInstalled = dep.installedCommit?.slice(0, 7) || '???';
+    const shortLatest = dep.latestCommit?.slice(0, 7) || '???';
+    const statusClass = dep.needsUpdate ? 'needs-update' : 'up-to-date';
+    
+    return `
+      <div class="git-dep-item ${statusClass}">
+        <span class="git-dep-name">${escapeHtml(dep.name)}</span>
+        <span class="git-dep-commits">
+          <span class="commit installed" title="Installed">${shortInstalled}</span>
+          ${dep.needsUpdate ? `→ <span class="commit latest" title="Latest available">${shortLatest}</span>` : ''}
+        </span>
+      </div>
+    `;
+  }).join('');
+  
+  container.innerHTML = `
+    <div class="slot-git-deps ${needsUpdate ? 'has-updates' : ''}">
+      <div class="git-deps-header">
+        <span class="git-deps-title">📦 Git Dependencies</span>
+        ${needsUpdate ? `
+          <span class="git-deps-badge update-available">${deps.updateCount} update${deps.updateCount > 1 ? 's' : ''}</span>
+        ` : `
+          <span class="git-deps-badge up-to-date">✓ Up to date</span>
+        `}
+      </div>
+      <div class="git-deps-list">
+        ${depsHtml}
+      </div>
+      ${needsUpdate ? `
+        <button class="btn-secondary btn-sm" onclick="updateSlotDeps('${slot}')">
+          ⬆️ Update Dependencies
+        </button>
+      ` : ''}
+    </div>
+  `;
+}
+
+/**
+ * Update git dependencies for a slot
+ */
+async function updateSlotDeps(slot) {
+  // Check if there are running bots
+  const slotData = currentSlots[slot];
+  let autoRestart = false;
+  
+  if (slotData?.runningBots?.length > 0) {
+    const message = `Bots running on ${slot}: ${slotData.runningBots.join(', ')}\n\nThis will update git dependencies (like membrane).\n\nRestart bots after update?`;
+    autoRestart = confirm(message);
+  } else if (!confirm(`Update git dependencies for ${slot}?\n\nThis will fetch the latest versions from their repositories.`)) {
+    return;
+  }
+  
+  try {
+    showToast(`Updating dependencies for ${slot}...`, 'info');
+    const result = await api.slots.updateDeps(slot, { autoRestart });
+    
+    if (result.success) {
+      if (result.skipped) {
+        showToast(result.reason, 'info');
+      } else {
+        const updated = result.results.filter(r => r.success).map(r => r.name);
+        if (updated.length > 0) {
+          showToast(`Updated: ${updated.join(', ')}`, 'success');
+        }
+        if (result.restartResults) {
+          const restarted = result.restartResults.filter(r => r.success).map(r => r.name);
+          if (restarted.length > 0) {
+            showToast(`Restarted: ${restarted.join(', ')}`, 'info');
+          }
+        }
+      }
+      // Reload deps status
+      await loadSlotDeps(slot);
+    } else {
+      const failed = result.results.filter(r => !r.success).map(r => r.name);
+      showToast(`Failed to update: ${failed.join(', ')}`, 'error');
+    }
+  } catch (error) {
+    showToast(error.message || 'Failed to update dependencies', 'error');
   }
 }
 
@@ -1067,6 +1185,14 @@ function renderSlots() {
               <span class="slot-running-bots-list">${slot.runningBots.join(', ')}</span>
             </div>
           ` : ''}
+          
+          <!-- Git Dependencies Section (populated async) -->
+          <div id="slotDeps-${name}" class="slot-deps-container">
+            <!-- Loading indicator -->
+            <div class="git-deps-loading">
+              <span class="spinner-sm"></span> Checking dependencies...
+            </div>
+          </div>
           
           <div class="slot-actions">
             <button class="btn-secondary" onclick="fetchSlot('${name}')">📥 Fetch</button>
@@ -1357,6 +1483,8 @@ window.viewSlotDiff = viewSlotDiff;
 window.closeDiffModal = closeDiffModal;
 window.discardSlotChanges = discardSlotChanges;
 window.copyDiffToClipboard = copyDiffToClipboard;
+window.loadSlotDeps = loadSlotDeps;
+window.updateSlotDeps = updateSlotDeps;
 
 // ============================================================================
 // DREAMS MANAGEMENT
