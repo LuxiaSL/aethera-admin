@@ -710,6 +710,9 @@ async function refreshLogs() {
   
   try {
     const data = await api.bots.logs(currentLogsBotName);
+    // Update title to show which slot's logs we're viewing
+    const slotInfo = data.slot ? ` (${data.slot})` : '';
+    document.getElementById('logsModalTitle').textContent = `Logs: ${currentLogsBotName}${slotInfo}`;
     document.getElementById('logsOutput').textContent = data.logs || '[No logs available]';
     scrollLogsToBottom();
   } catch (error) {

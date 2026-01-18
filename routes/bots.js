@@ -139,18 +139,20 @@ router.post('/:name/restart', async (req, res) => {
 
 /**
  * GET /api/bots/:name/logs
- * Get bot logs from screen session
+ * Get bot logs from journalctl for the preferred slot
  */
 router.get('/:name/logs', async (req, res) => {
   try {
     const { name } = req.params;
     const { lines = 200 } = req.query;
     
-    const logs = await chapterx.getBotLogs(name, parseInt(lines));
+    const result = await chapterx.getBotLogs(name, parseInt(lines));
     
     res.json({ 
       name,
-      logs,
+      logs: result.logs,
+      slot: result.slot,
+      serviceName: result.serviceName,
       lines: parseInt(lines),
     });
   } catch (error) {
