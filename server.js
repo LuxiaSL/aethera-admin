@@ -18,6 +18,7 @@ const servicesRoutes = require('./routes/services');
 const slotsRoutes = require('./routes/slots');
 const dreamsRoutes = require('./routes/dreams');
 const blogRoutes = require('./routes/blog');
+const serverRoutes = require('./routes/server');
 
 const app = express();
 
@@ -44,6 +45,7 @@ app.use('/api/services', servicesRoutes);
 app.use('/api/slots', slotsRoutes);
 app.use('/api/dreams', dreamsRoutes);
 app.use('/api/blog', blogRoutes);
+app.use('/api/server', serverRoutes);
 
 // Placeholder routes - will be implemented in later phases
 // app.use('/api/irc', require('./routes/irc'));

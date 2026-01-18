@@ -17,6 +17,7 @@
   <link rel="stylesheet" href="/css/pages/services.css">
   <link rel="stylesheet" href="/css/pages/dreams.css">
   <link rel="stylesheet" href="/css/pages/blog.css">
+  <link rel="stylesheet" href="/css/pages/server.css">
 </head>
 <body>
   <!-- Login Screen -->
@@ -94,6 +95,7 @@
       <button class="nav-tab" data-page="dreams">🎨 Dreams</button>
       <button class="nav-tab" data-page="blog">📝 Blog</button>
       <button class="nav-tab" data-page="irc">💬 IRC</button>
+      <button class="nav-tab" data-page="server">🖥️ Server</button>
       <button class="nav-tab" data-page="settings">🔧 Settings</button>
     </nav>
     
@@ -307,6 +309,37 @@
             <button class="btn-ghost" onclick="scrollAetheraLogsToBottom()">⬇️ Scroll to bottom</button>
           </div>
           <pre id="aetheraLogsOutput" class="logs-output">[Loading...]</pre>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Git Diff Modal -->
+    <div id="diffModal" class="modal-overlay diff-modal" onclick="closeDiffModal(event)">
+      <div class="modal modal-wide" onclick="event.stopPropagation()">
+        <div class="modal-header">
+          <span class="modal-title">
+            <span id="diffModalTitle">Git Changes</span>
+          </span>
+          <button class="modal-close" onclick="closeDiffModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="diff-summary">
+            <div class="diff-file-list">
+              <h4>Modified Files (<span id="diffFileCount">0</span>)</h4>
+              <ul id="diffFilesList"></ul>
+            </div>
+          </div>
+          <div class="diff-content">
+            <h4>Diff Output</h4>
+            <pre id="diffOutput" class="diff-output">[Loading...]</pre>
+            <div id="diffTruncatedWarning" class="diff-truncated" style="display: none;">
+              ⚠️ Diff output was truncated (exceeds 50KB limit)
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-danger" onclick="discardSlotChanges()">🗑️ Discard All Changes</button>
+          <button class="btn-secondary" onclick="closeDiffModal()">Close</button>
         </div>
       </div>
     </div>
@@ -661,6 +694,203 @@
         <div class="empty-state-icon">💬</div>
         <p class="empty-state-title">Coming Soon</p>
         <p class="empty-state-description">IRC review will be implemented in Phase 6</p>
+      </div>
+    </div>
+    
+    <!-- Server Monitoring Page -->
+    <div id="page-server" class="page-content">
+      <div class="page-header">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+          <div>
+            <h1 class="page-title">Server Monitoring</h1>
+            <p class="page-subtitle">System metrics, logs, and diagnostics</p>
+          </div>
+          <div class="auto-refresh-indicator">
+            <span class="auto-refresh-dot"></span>
+            <span>Auto-refresh: <span id="serverRefreshInterval">5s</span></span>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Server Info Header -->
+      <div class="server-info-header">
+        <div class="server-hostname" id="serverHostname">—</div>
+        <div class="server-meta">
+          <div class="server-meta-item">
+            <span>Uptime:</span>
+            <span id="serverUptime">—</span>
+          </div>
+          <div class="server-meta-item">
+            <span>Platform:</span>
+            <span id="serverPlatform">—</span>
+          </div>
+        </div>
+      </div>
+      
+      <!-- System Metrics Section -->
+      <div class="server-section">
+        <h2 class="server-section-title">📊 System Metrics</h2>
+        
+        <div class="server-metrics-grid">
+          <!-- CPU Card -->
+          <div class="metric-card">
+            <div class="metric-card-header">
+              <div class="metric-card-title">
+                <span class="emoji">⚡</span>
+                <span>CPU Usage</span>
+              </div>
+            </div>
+            <div class="metric-card-value" id="cpuPercent">—<span class="metric-card-unit">%</span></div>
+            <div class="metric-card-subtitle" id="cpuCores">— cores</div>
+            <div class="metric-bar-container">
+              <div class="metric-bar">
+                <div class="metric-bar-fill" id="cpuBar" style="width: 0%;"></div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Memory Card -->
+          <div class="metric-card">
+            <div class="metric-card-header">
+              <div class="metric-card-title">
+                <span class="emoji">🧠</span>
+                <span>Memory</span>
+              </div>
+            </div>
+            <div class="metric-card-value" id="memPercent">—<span class="metric-card-unit">%</span></div>
+            <div class="metric-card-subtitle" id="memUsage">— / —</div>
+            <div class="metric-bar-container">
+              <div class="metric-bar">
+                <div class="metric-bar-fill" id="memBar" style="width: 0%;"></div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Load Average Card -->
+          <div class="metric-card">
+            <div class="metric-card-header">
+              <div class="metric-card-title">
+                <span class="emoji">📈</span>
+                <span>Load Average</span>
+              </div>
+            </div>
+            <div class="load-averages">
+              <div class="load-average-item">
+                <div class="load-average-value" id="load1">—</div>
+                <div class="load-average-label">1m</div>
+              </div>
+              <div class="load-average-item">
+                <div class="load-average-value" id="load5">—</div>
+                <div class="load-average-label">5m</div>
+              </div>
+              <div class="load-average-item">
+                <div class="load-average-value" id="load15">—</div>
+                <div class="load-average-label">15m</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Disk Usage Section -->
+      <div class="server-section">
+        <h2 class="server-section-title">💾 Disk Usage</h2>
+        
+        <div class="metric-card" style="overflow-x: auto;">
+          <table class="disk-table" id="diskTable">
+            <thead>
+              <tr>
+                <th>Mount</th>
+                <th>Size</th>
+                <th>Used</th>
+                <th>Available</th>
+                <th style="width: 150px;">Usage</th>
+              </tr>
+            </thead>
+            <tbody id="diskTableBody">
+              <tr>
+                <td colspan="5" style="color: var(--text-muted); text-align: center;">Loading...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      
+      <!-- Network Diagnostics Section -->
+      <div class="server-section">
+        <h2 class="server-section-title">🌐 Network</h2>
+        
+        <div class="network-status-card">
+          <div class="network-status-header">
+            <span class="network-status-title">Connectivity Status</span>
+            <span class="network-status-badge" id="networkStatusBadge">Checking...</span>
+          </div>
+          
+          <div class="network-hosts" id="networkHosts">
+            <!-- Populated by JS -->
+          </div>
+          
+          <div class="ping-test-form">
+            <input type="text" 
+                   id="pingHostInput" 
+                   class="ping-test-input" 
+                   placeholder="Host to ping..."
+                   value="8.8.8.8">
+            <button class="btn-secondary" onclick="runPingTest()">📡 Ping</button>
+          </div>
+          <div id="pingResult" class="ping-result" style="display: none;"></div>
+        </div>
+      </div>
+      
+      <!-- Log Management Section -->
+      <div class="server-section">
+        <h2 class="server-section-title">📜 Log Management</h2>
+        
+        <div class="logs-management-card">
+          <div class="logs-grid">
+            <!-- Journal Logs -->
+            <div class="log-item">
+              <div class="log-item-header">
+                <span class="log-item-name">📋 Systemd Journal</span>
+                <span class="log-item-size" id="journalSize">—</span>
+              </div>
+              <div class="log-item-actions">
+                <button class="btn-secondary" onclick="trimJournalLogs('500M')">Trim to 500MB</button>
+                <button class="btn-secondary" onclick="trimJournalLogs('100M')">Trim to 100MB</button>
+              </div>
+            </div>
+            
+            <!-- Docker Logs -->
+            <div class="log-item">
+              <div class="log-item-header">
+                <span class="log-item-name">🐳 Docker System</span>
+                <span class="log-item-size" id="dockerSize">—</span>
+              </div>
+              <div class="log-item-actions">
+                <button class="btn-secondary" onclick="pruneDockerSystem()">🧹 Prune Unused</button>
+              </div>
+            </div>
+          </div>
+          
+          <div id="logTrimResult" style="margin-top: var(--space-md); display: none;">
+            <pre style="background: var(--bg-secondary); padding: var(--space-sm); font-size: var(--text-xs); max-height: 150px; overflow: auto;"></pre>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Service Health Section -->
+      <div class="server-section">
+        <h2 class="server-section-title">🔧 Service Health</h2>
+        
+        <div class="services-health-card">
+          <div class="services-health-grid" id="servicesHealthGrid">
+            <!-- Populated by JS -->
+            <div class="service-health-item">
+              <span class="status-dot"></span>
+              <span class="service-health-name">Loading...</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
     

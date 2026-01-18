@@ -201,6 +201,9 @@ function navigateTo(page) {
     case 'irc':
       loadIRC();
       break;
+    case 'server':
+      loadServer();
+      break;
   }
 }
 
@@ -875,7 +878,10 @@ function renderSlots() {
     }
     
     // Build status indicators
-    const dirtyIndicator = slot.dirty ? '<span class="slot-git-value dirty">● Modified</span>' : '';
+    const dirtyIndicator = slot.dirty 
+      ? `<span class="slot-git-value dirty">● Modified</span>
+         <button class="btn-link btn-xs" onclick="viewSlotDiff('${name}')" title="View changes">View</button>`
+      : '';
     const behindIndicator = slot.behind > 0 ? `<span class="slot-git-value behind">↓ ${slot.behind} behind</span>` : '';
     const aheadIndicator = slot.ahead > 0 ? `<span class="slot-git-value ahead">↑ ${slot.ahead} ahead</span>` : '';
     
@@ -1043,6 +1049,124 @@ async function checkoutSlot(slot, branch) {
   }
 }
 
+// ============================================================================
+// GIT DIFF MODAL
+// ============================================================================
+
+let currentDiffSlot = null;
+
+async function viewSlotDiff(slot) {
+  currentDiffSlot = slot;
+  const modal = document.getElementById('diffModal');
+  const title = document.getElementById('diffModalTitle');
+  const fileCount = document.getElementById('diffFileCount');
+  const filesList = document.getElementById('diffFilesList');
+  const diffOutput = document.getElementById('diffOutput');
+  const truncatedWarning = document.getElementById('diffTruncatedWarning');
+  
+  // Show modal using active class pattern
+  modal.classList.add('active');
+  title.textContent = `Git Changes - ${slot.toUpperCase()}`;
+  diffOutput.textContent = '[Loading...]';
+  filesList.innerHTML = '<li>Loading...</li>';
+  truncatedWarning.style.display = 'none';
+  
+  try {
+    const data = await api.slots.diff(slot);
+    
+    // Update file count
+    fileCount.textContent = data.fileCount || 0;
+    
+    // Render file list
+    if (data.files && data.files.length > 0) {
+      filesList.innerHTML = data.files.map(f => {
+        const statusClass = {
+          'modified': 'file-modified',
+          'added': 'file-added',
+          'deleted': 'file-deleted',
+          'untracked': 'file-untracked',
+          'renamed': 'file-renamed',
+          'conflict': 'file-conflict',
+        }[f.status] || '';
+        
+        return `<li class="${statusClass}">
+          <span class="file-status">${f.status.toUpperCase()}</span>
+          <span class="file-path">${escapeHtml(f.path)}</span>
+        </li>`;
+      }).join('');
+    } else {
+      filesList.innerHTML = '<li class="no-changes">No modified files</li>';
+    }
+    
+    // Render diff output
+    if (data.diff) {
+      diffOutput.innerHTML = formatDiffOutput(data.diff);
+    } else if (data.diffStat) {
+      diffOutput.textContent = data.diffStat;
+    } else {
+      diffOutput.textContent = 'No tracked file changes (may only have untracked files)';
+    }
+    
+    // Show truncation warning
+    if (data.truncated) {
+      truncatedWarning.style.display = 'block';
+    }
+  } catch (error) {
+    diffOutput.textContent = `Error: ${error.message}`;
+    filesList.innerHTML = '<li class="error">Failed to load</li>';
+  }
+}
+
+function formatDiffOutput(diff) {
+  // Syntax highlight the diff output
+  const lines = diff.split('\n');
+  return lines.map(line => {
+    if (line.startsWith('+++') || line.startsWith('---')) {
+      return `<span class="diff-file-header">${escapeHtml(line)}</span>`;
+    } else if (line.startsWith('@@')) {
+      return `<span class="diff-hunk">${escapeHtml(line)}</span>`;
+    } else if (line.startsWith('+')) {
+      return `<span class="diff-add">${escapeHtml(line)}</span>`;
+    } else if (line.startsWith('-')) {
+      return `<span class="diff-del">${escapeHtml(line)}</span>`;
+    } else if (line.startsWith('diff --git')) {
+      return `<span class="diff-header">${escapeHtml(line)}</span>`;
+    }
+    return escapeHtml(line);
+  }).join('\n');
+}
+
+function closeDiffModal(event) {
+  if (event && event.target !== event.currentTarget) return;
+  const modal = document.getElementById('diffModal');
+  modal.classList.remove('active');
+  currentDiffSlot = null;
+}
+
+async function discardSlotChanges() {
+  if (!currentDiffSlot) return;
+  
+  const confirmed = confirm(`⚠️ DANGER: This will permanently discard ALL local changes in the ${currentDiffSlot.toUpperCase()} slot.\n\nThis includes:\n- Modified files\n- Untracked files\n\nThis action cannot be undone. Continue?`);
+  
+  if (!confirmed) return;
+  
+  try {
+    showToast(`Discarding changes in ${currentDiffSlot}...`, 'info');
+    const result = await api.slots.discard(currentDiffSlot);
+    
+    if (result.success) {
+      showToast(`Discarded all changes in ${currentDiffSlot}`, 'success');
+      currentSlots[currentDiffSlot] = result.status;
+      renderSlots();
+      closeDiffModal();
+    } else {
+      showToast('Failed to discard changes', 'error');
+    }
+  } catch (error) {
+    showToast(error.message || 'Failed to discard changes', 'error');
+  }
+}
+
 // Make services functions global
 window.loadServices = loadServices;
 window.refreshAetheraStatus = refreshAetheraStatus;
@@ -1058,6 +1182,9 @@ window.refreshSlot = refreshSlot;
 window.fetchSlot = fetchSlot;
 window.pullSlot = pullSlot;
 window.checkoutSlot = checkoutSlot;
+window.viewSlotDiff = viewSlotDiff;
+window.closeDiffModal = closeDiffModal;
+window.discardSlotChanges = discardSlotChanges;
 
 // ============================================================================
 // DREAMS MANAGEMENT
@@ -1727,6 +1854,346 @@ window.closeDeleteModal = closeDeleteModal;
 async function loadIRC() {
   // TODO: Implement in Phase 6
 }
+
+// ============================================================================
+// SERVER MONITORING
+// ============================================================================
+
+let serverMetrics = null;
+let serverRefreshInterval = null;
+
+async function loadServer() {
+  // Start auto-refresh
+  startServerAutoRefresh();
+  
+  // Load initial data
+  await refreshServerMetrics();
+  await refreshNetworkStatus();
+  await refreshLogSizes();
+  await refreshServiceHealth();
+}
+
+async function refreshServerMetrics() {
+  try {
+    serverMetrics = await api.server.metrics();
+    renderServerMetrics();
+  } catch (error) {
+    console.error('Error loading server metrics:', error);
+  }
+}
+
+function renderServerMetrics() {
+  if (!serverMetrics) return;
+  
+  // Server info header
+  document.getElementById('serverHostname').textContent = serverMetrics.hostname || '—';
+  document.getElementById('serverUptime').textContent = serverMetrics.uptime?.formatted || '—';
+  document.getElementById('serverPlatform').textContent = 
+    `${serverMetrics.platform || '—'} (${serverMetrics.arch || '—'})`;
+  
+  // CPU
+  const cpu = serverMetrics.cpu || {};
+  const cpuPercent = cpu.percent ?? 0;
+  document.getElementById('cpuPercent').innerHTML = `${cpuPercent}<span class="metric-card-unit">%</span>`;
+  document.getElementById('cpuCores').textContent = `${cpu.cores || '—'} cores`;
+  
+  const cpuBar = document.getElementById('cpuBar');
+  cpuBar.style.width = `${cpuPercent}%`;
+  cpuBar.className = `metric-bar-fill ${getBarClass(cpuPercent)}`;
+  
+  // Memory
+  const mem = serverMetrics.memory || {};
+  const memPercent = mem.percent ?? 0;
+  document.getElementById('memPercent').innerHTML = `${memPercent}<span class="metric-card-unit">%</span>`;
+  document.getElementById('memUsage').textContent = 
+    `${mem.usedFormatted || '—'} / ${mem.totalFormatted || '—'}`;
+  
+  const memBar = document.getElementById('memBar');
+  memBar.style.width = `${memPercent}%`;
+  memBar.className = `metric-bar-fill ${getBarClass(memPercent)}`;
+  
+  // Load averages
+  const load = serverMetrics.load || {};
+  document.getElementById('load1').textContent = load.load1 || '—';
+  document.getElementById('load5').textContent = load.load5 || '—';
+  document.getElementById('load15').textContent = load.load15 || '—';
+  
+  // Disk table
+  renderDiskTable(serverMetrics.disk || []);
+  
+  // Journal size (if available in metrics)
+  if (serverMetrics.journal?.size) {
+    document.getElementById('journalSize').textContent = serverMetrics.journal.size;
+  }
+}
+
+function getBarClass(percent) {
+  if (percent >= 90) return 'error';
+  if (percent >= 70) return 'warning';
+  return 'success';
+}
+
+function renderDiskTable(disks) {
+  const tbody = document.getElementById('diskTableBody');
+  
+  if (!disks || disks.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="5" style="color: var(--text-muted); text-align: center;">No disk data available</td>
+      </tr>
+    `;
+    return;
+  }
+  
+  tbody.innerHTML = disks.map(disk => `
+    <tr>
+      <td class="mount-path">${escapeHtml(disk.mount)}</td>
+      <td class="disk-size">${disk.sizeFormatted}</td>
+      <td class="disk-size">${disk.usedFormatted}</td>
+      <td class="disk-size">${disk.availableFormatted}</td>
+      <td>
+        <div class="metric-bar-label">
+          <span></span>
+          <span>${disk.percent}%</span>
+        </div>
+        <div class="metric-bar disk-bar">
+          <div class="metric-bar-fill ${getBarClass(disk.percent)}" style="width: ${disk.percent}%;"></div>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function refreshNetworkStatus() {
+  try {
+    const network = await api.server.network();
+    renderNetworkStatus(network);
+  } catch (error) {
+    console.error('Error loading network status:', error);
+    document.getElementById('networkStatusBadge').className = 'network-status-badge offline';
+    document.getElementById('networkStatusBadge').textContent = 'Error';
+  }
+}
+
+function renderNetworkStatus(network) {
+  // Status badge
+  const badge = document.getElementById('networkStatusBadge');
+  badge.className = `network-status-badge ${network.status}`;
+  badge.textContent = network.status === 'connected' ? '✓ Connected' :
+                      network.status === 'degraded' ? '⚠ Degraded' : '✗ Offline';
+  
+  // Host list
+  const hostsContainer = document.getElementById('networkHosts');
+  hostsContainer.innerHTML = (network.hosts || []).map(host => `
+    <div class="network-host">
+      <span class="network-host-name">${escapeHtml(host.name)}</span>
+      <span class="network-host-latency ${host.success ? 'success' : 'error'}">
+        ${host.success ? `${host.latencyMs}` : '✗'}
+      </span>
+    </div>
+  `).join('');
+}
+
+async function runPingTest() {
+  const host = document.getElementById('pingHostInput').value.trim();
+  const resultDiv = document.getElementById('pingResult');
+  
+  if (!host) {
+    resultDiv.style.display = 'block';
+    resultDiv.className = 'ping-result error';
+    resultDiv.textContent = 'Please enter a host';
+    return;
+  }
+  
+  resultDiv.style.display = 'block';
+  resultDiv.className = 'ping-result';
+  resultDiv.textContent = `Pinging ${host}...`;
+  
+  try {
+    const result = await api.server.ping(host);
+    
+    if (result.success) {
+      resultDiv.className = 'ping-result success';
+      resultDiv.textContent = `✓ ${host}: ${result.latencyMs} RTT`;
+    } else {
+      resultDiv.className = 'ping-result error';
+      resultDiv.textContent = `✗ ${host}: ${result.error || 'Unreachable'}`;
+    }
+  } catch (error) {
+    resultDiv.className = 'ping-result error';
+    resultDiv.textContent = `✗ Error: ${error.message}`;
+  }
+}
+
+async function refreshLogSizes() {
+  try {
+    const sizes = await api.server.logSizes();
+    
+    // Journal size
+    if (sizes.journal?.available) {
+      document.getElementById('journalSize').textContent = sizes.journal.size || '—';
+    } else {
+      document.getElementById('journalSize').textContent = 'N/A';
+    }
+    
+    // Docker size (simplified)
+    if (sizes.docker?.available) {
+      document.getElementById('dockerSize').textContent = 'Available';
+    } else {
+      document.getElementById('dockerSize').textContent = sizes.docker?.error || 'N/A';
+    }
+  } catch (error) {
+    console.error('Error loading log sizes:', error);
+  }
+}
+
+async function trimJournalLogs(size) {
+  const resultDiv = document.getElementById('logTrimResult');
+  const pre = resultDiv.querySelector('pre');
+  
+  resultDiv.style.display = 'block';
+  pre.textContent = `Trimming journal logs to ${size}...`;
+  
+  try {
+    showToast(`Trimming journal logs to ${size}...`, 'info');
+    const result = await api.server.trimJournal({ size });
+    
+    if (result.success) {
+      pre.textContent = `✓ Trimmed successfully\n\nBefore: ${result.sizeBefore || '—'}\nAfter: ${result.sizeAfter || '—'}\n\n${result.output || ''}`;
+      showToast('Journal logs trimmed', 'success');
+      
+      // Refresh sizes
+      await refreshLogSizes();
+    } else {
+      pre.textContent = `✗ Trim failed\n\n${result.error || result.output || 'Unknown error'}`;
+      showToast('Failed to trim logs', 'error');
+    }
+  } catch (error) {
+    pre.textContent = `✗ Error: ${error.message}`;
+    showToast('Failed to trim logs', 'error');
+  }
+}
+
+async function pruneDockerSystem() {
+  const resultDiv = document.getElementById('logTrimResult');
+  const pre = resultDiv.querySelector('pre');
+  
+  if (!confirm('Prune Docker system? This will remove unused containers, networks, and images.')) {
+    return;
+  }
+  
+  resultDiv.style.display = 'block';
+  pre.textContent = 'Pruning Docker system...';
+  
+  try {
+    showToast('Pruning Docker system...', 'info');
+    const result = await api.server.pruneDocker();
+    
+    if (result.success) {
+      pre.textContent = `✓ Docker pruned successfully\n\n${result.output || ''}`;
+      showToast('Docker system pruned', 'success');
+      
+      // Refresh sizes
+      await refreshLogSizes();
+    } else {
+      pre.textContent = `✗ Prune failed\n\n${result.error || result.output || 'Unknown error'}`;
+      showToast('Failed to prune Docker', 'error');
+    }
+  } catch (error) {
+    pre.textContent = `✗ Error: ${error.message}`;
+    showToast('Failed to prune Docker', 'error');
+  }
+}
+
+async function refreshServiceHealth() {
+  try {
+    const services = await api.server.services();
+    renderServiceHealth(services);
+  } catch (error) {
+    console.error('Error loading service health:', error);
+  }
+}
+
+function renderServiceHealth(services) {
+  const grid = document.getElementById('servicesHealthGrid');
+  const items = [];
+  
+  // Admin service (self)
+  if (services.admin) {
+    items.push({
+      name: 'aethera-admin',
+      running: true,
+      status: 'running',
+    });
+  }
+  
+  // Aethera (Docker)
+  if (services.aethera) {
+    items.push({
+      name: 'aethera (blog)',
+      running: services.aethera.running,
+      status: services.aethera.running ? 
+        (services.aethera.health === 'healthy' ? 'running' : 'error') : 'stopped',
+    });
+  }
+  
+  // Bots
+  if (services.bots?.list) {
+    for (const bot of services.bots.list) {
+      items.push({
+        name: `bot: ${bot.name}`,
+        running: bot.running,
+        status: bot.running ? 'running' : (bot.state === 'error' ? 'error' : 'stopped'),
+      });
+    }
+  }
+  
+  if (items.length === 0) {
+    grid.innerHTML = `
+      <div class="service-health-item">
+        <span class="status-dot stopped"></span>
+        <span class="service-health-name">No services found</span>
+      </div>
+    `;
+    return;
+  }
+  
+  grid.innerHTML = items.map(item => `
+    <div class="service-health-item">
+      <span class="status-dot ${item.running ? 'running' : 'stopped'}"></span>
+      <span class="service-health-name">${escapeHtml(item.name)}</span>
+      <span class="service-health-status ${item.status}">${item.status}</span>
+    </div>
+  `).join('');
+}
+
+function startServerAutoRefresh() {
+  // Clear any existing interval
+  if (serverRefreshInterval) {
+    clearInterval(serverRefreshInterval);
+  }
+  
+  // Refresh every 5 seconds when on server page
+  serverRefreshInterval = setInterval(() => {
+    if (state.currentPage === 'server') {
+      refreshServerMetrics();
+    } else {
+      // Stop auto-refresh when not on server page
+      clearInterval(serverRefreshInterval);
+      serverRefreshInterval = null;
+    }
+  }, 5000);
+}
+
+// Make server functions global
+window.loadServer = loadServer;
+window.refreshServerMetrics = refreshServerMetrics;
+window.refreshNetworkStatus = refreshNetworkStatus;
+window.runPingTest = runPingTest;
+window.refreshLogSizes = refreshLogSizes;
+window.trimJournalLogs = trimJournalLogs;
+window.pruneDockerSystem = pruneDockerSystem;
+window.refreshServiceHealth = refreshServiceHealth;
 
 // ============================================================================
 // UTILITIES

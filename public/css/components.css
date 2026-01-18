@@ -327,6 +327,10 @@
   transform: scale(1) translateY(0);
 }
 
+.modal.modal-wide {
+  max-width: 900px;
+}
+
 .modal-header {
   display: flex;
   align-items: center;
@@ -507,5 +511,166 @@
 }
 
 .empty-state-description {
+  font-size: var(--text-sm);
+}
+
+/* ============================================================================
+   EXTRA BUTTON VARIANTS
+   ============================================================================ */
+
+.btn-link {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  padding: 0;
+  font-size: var(--text-sm);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.btn-link:hover {
+  color: var(--text-primary);
+  border: none;
+  box-shadow: none;
+}
+
+.btn-xs {
+  font-size: var(--text-xs);
+  padding: 2px 6px;
+}
+
+/* ============================================================================
+   DIFF MODAL
+   ============================================================================ */
+
+.diff-modal .modal-body {
+  max-height: 70vh;
+}
+
+.diff-summary {
+  margin-bottom: var(--space-lg);
+  padding-bottom: var(--space-md);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.diff-summary h4,
+.diff-content h4 {
+  font-size: var(--text-sm);
+  font-weight: 400;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: var(--space-sm);
+}
+
+.diff-file-list ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.diff-file-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-subtle);
+}
+
+.diff-file-list .file-status {
+  font-size: var(--text-xs);
+  padding: 2px 6px;
+  border: 1px solid var(--border-subtle);
+  min-width: 80px;
+  text-align: center;
+}
+
+.diff-file-list .file-path {
+  color: var(--text-secondary);
+}
+
+.diff-file-list li.file-modified .file-status {
+  background: rgba(250, 204, 21, 0.1);
+  border-color: rgba(250, 204, 21, 0.3);
+  color: var(--status-warning);
+}
+
+.diff-file-list li.file-added .file-status {
+  background: rgba(74, 222, 128, 0.1);
+  border-color: rgba(74, 222, 128, 0.3);
+  color: var(--status-success);
+}
+
+.diff-file-list li.file-deleted .file-status {
+  background: rgba(248, 113, 113, 0.1);
+  border-color: rgba(248, 113, 113, 0.3);
+  color: var(--status-error);
+}
+
+.diff-file-list li.file-untracked .file-status {
+  background: rgba(147, 197, 253, 0.1);
+  border-color: rgba(147, 197, 253, 0.3);
+  color: var(--status-info);
+}
+
+.diff-file-list li.no-changes {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.diff-file-list li.error {
+  color: var(--status-error);
+}
+
+.diff-output {
+  background: var(--bg-primary);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  padding: var(--space-md);
+  overflow: auto;
+  max-height: 400px;
+  white-space: pre;
+  word-break: break-all;
+  border: 1px solid var(--border-subtle);
+  line-height: 1.5;
+}
+
+.diff-output .diff-header {
+  color: var(--text-muted);
+  font-weight: bold;
+}
+
+.diff-output .diff-file-header {
+  color: var(--text-secondary);
+  font-weight: bold;
+}
+
+.diff-output .diff-hunk {
+  color: var(--status-info);
+  background: rgba(147, 197, 253, 0.1);
+}
+
+.diff-output .diff-add {
+  color: var(--status-success);
+  background: rgba(74, 222, 128, 0.1);
+}
+
+.diff-output .diff-del {
+  color: var(--status-error);
+  background: rgba(248, 113, 113, 0.1);
+}
+
+.diff-truncated {
+  margin-top: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  background: rgba(250, 204, 21, 0.1);
+  border: 1px solid rgba(250, 204, 21, 0.3);
+  color: var(--status-warning);
   font-size: var(--text-sm);
 }

@@ -209,6 +209,22 @@ const api = {
     async getBots(slot) {
       return api.request(`/slots/${slot}/bots`);
     },
+    
+    /**
+     * Get git diff for a slot (modified files and changes)
+     * @param {string} slot - Slot name
+     */
+    async diff(slot) {
+      return api.request(`/slots/${slot}/diff`);
+    },
+    
+    /**
+     * Discard all local changes in a slot
+     * @param {string} slot - Slot name
+     */
+    async discard(slot) {
+      return api.request(`/slots/${slot}/discard`, { method: 'POST' });
+    },
   },
   
   // ============================================================================
@@ -396,6 +412,108 @@ const api = {
     async queue() {
       // TODO: Implement in Phase 6
       return { fragments: [] };
+    },
+  },
+  
+  // ============================================================================
+  // SERVER MONITORING
+  // ============================================================================
+  
+  server: {
+    /**
+     * Get all system metrics (CPU, memory, disk, load)
+     */
+    async metrics() {
+      return api.request('/server/metrics');
+    },
+    
+    /**
+     * Get CPU usage
+     */
+    async cpu() {
+      return api.request('/server/cpu');
+    },
+    
+    /**
+     * Get memory usage
+     */
+    async memory() {
+      return api.request('/server/memory');
+    },
+    
+    /**
+     * Get disk usage
+     */
+    async disk() {
+      return api.request('/server/disk');
+    },
+    
+    /**
+     * Get load average
+     */
+    async load() {
+      return api.request('/server/load');
+    },
+    
+    /**
+     * Get system uptime
+     */
+    async uptime() {
+      return api.request('/server/uptime');
+    },
+    
+    /**
+     * Check network connectivity
+     */
+    async network() {
+      return api.request('/server/network');
+    },
+    
+    /**
+     * Ping a specific host
+     * @param {string} host - Host to ping
+     */
+    async ping(host = '8.8.8.8') {
+      return api.request('/server/ping', {
+        method: 'POST',
+        body: { host },
+      });
+    },
+    
+    /**
+     * Get log sizes (journal, docker)
+     */
+    async logSizes() {
+      return api.request('/server/logs/sizes');
+    },
+    
+    /**
+     * Trim journal logs
+     * @param {Object} options
+     * @param {string} options.size - Max size (e.g., '500M')
+     * @param {string} options.time - Max age (e.g., '7d')
+     */
+    async trimJournal(options = {}) {
+      return api.request('/server/logs/trim/journal', {
+        method: 'POST',
+        body: options,
+      });
+    },
+    
+    /**
+     * Prune Docker system
+     */
+    async pruneDocker() {
+      return api.request('/server/logs/trim/docker', {
+        method: 'POST',
+      });
+    },
+    
+    /**
+     * Get all service health statuses
+     */
+    async services() {
+      return api.request('/server/services');
     },
   },
 };

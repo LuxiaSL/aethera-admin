@@ -1,0 +1,540 @@
+/* server.css - Server monitoring page styles */
+
+/* ============================================================================
+   METRICS GRID
+   ============================================================================ */
+
+.server-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+}
+
+.metric-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  padding: var(--space-lg);
+  position: relative;
+  overflow: hidden;
+}
+
+.metric-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--space-md);
+}
+
+.metric-card-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.metric-card-title .emoji {
+  font-size: var(--text-lg);
+}
+
+.metric-card-value {
+  font-size: var(--text-3xl);
+  font-weight: normal;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  line-height: 1;
+}
+
+.metric-card-value.success {
+  color: var(--status-success);
+}
+
+.metric-card-value.warning {
+  color: var(--status-warning);
+}
+
+.metric-card-value.error {
+  color: var(--status-error);
+}
+
+.metric-card-unit {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  margin-left: var(--space-xs);
+}
+
+.metric-card-subtitle {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  margin-top: var(--space-sm);
+}
+
+/* ============================================================================
+   PROGRESS BARS
+   ============================================================================ */
+
+.metric-bar-container {
+  margin-top: var(--space-md);
+}
+
+.metric-bar-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  margin-bottom: var(--space-xs);
+}
+
+.metric-bar {
+  height: 6px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  position: relative;
+  overflow: hidden;
+}
+
+.metric-bar-fill {
+  height: 100%;
+  background: var(--text-secondary);
+  transition: width var(--transition-normal), background var(--transition-normal);
+}
+
+.metric-bar-fill.success {
+  background: var(--status-success);
+  box-shadow: var(--glow-success);
+}
+
+.metric-bar-fill.warning {
+  background: var(--status-warning);
+}
+
+.metric-bar-fill.error {
+  background: var(--status-error);
+  box-shadow: var(--glow-error);
+}
+
+/* ============================================================================
+   DISK USAGE TABLE
+   ============================================================================ */
+
+.disk-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.disk-table th {
+  text-align: left;
+  padding: var(--space-sm);
+  color: var(--text-muted);
+  font-weight: normal;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: var(--text-xs);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.disk-table td {
+  padding: var(--space-sm);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.disk-table .mount-path {
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+}
+
+.disk-table .disk-size {
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+}
+
+.disk-table .disk-bar {
+  width: 100px;
+}
+
+/* ============================================================================
+   NETWORK STATUS
+   ============================================================================ */
+
+.network-status-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  padding: var(--space-lg);
+  margin-bottom: var(--space-lg);
+}
+
+.network-status-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-md);
+}
+
+.network-status-title {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.network-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-sm);
+  font-size: var(--text-sm);
+  border: 1px solid;
+}
+
+.network-status-badge.connected {
+  color: var(--status-success);
+  border-color: var(--status-success);
+  background: rgba(74, 222, 128, 0.1);
+}
+
+.network-status-badge.degraded {
+  color: var(--status-warning);
+  border-color: var(--status-warning);
+  background: rgba(250, 204, 21, 0.1);
+}
+
+.network-status-badge.offline {
+  color: var(--status-error);
+  border-color: var(--status-error);
+  background: rgba(248, 113, 113, 0.1);
+}
+
+.network-hosts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-md);
+}
+
+.network-host {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-sm);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+}
+
+.network-host-name {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.network-host-latency {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+.network-host-latency.success {
+  color: var(--status-success);
+}
+
+.network-host-latency.error {
+  color: var(--status-error);
+}
+
+/* ============================================================================
+   LOG MANAGEMENT
+   ============================================================================ */
+
+.logs-management-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  padding: var(--space-lg);
+  margin-bottom: var(--space-lg);
+}
+
+.logs-management-title {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--space-md);
+}
+
+.logs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--space-lg);
+}
+
+.log-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.log-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.log-item-name {
+  font-weight: normal;
+  color: var(--text-primary);
+}
+
+.log-item-size {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.log-item-actions {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+/* ============================================================================
+   SERVICE HEALTH OVERVIEW
+   ============================================================================ */
+
+.services-health-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  padding: var(--space-lg);
+  margin-bottom: var(--space-lg);
+}
+
+.services-health-title {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--space-md);
+}
+
+.services-health-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-md);
+}
+
+.service-health-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+}
+
+.service-health-item .status-dot {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+}
+
+.service-health-name {
+  flex: 1;
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+}
+
+.service-health-status {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.service-health-status.running {
+  color: var(--status-success);
+}
+
+.service-health-status.stopped {
+  color: var(--text-muted);
+}
+
+.service-health-status.error {
+  color: var(--status-error);
+}
+
+/* ============================================================================
+   LOAD AVERAGE DISPLAY
+   ============================================================================ */
+
+.load-averages {
+  display: flex;
+  gap: var(--space-lg);
+  margin-top: var(--space-md);
+}
+
+.load-average-item {
+  text-align: center;
+}
+
+.load-average-value {
+  font-family: var(--font-mono);
+  font-size: var(--text-xl);
+  color: var(--text-primary);
+}
+
+.load-average-label {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  margin-top: var(--space-xs);
+}
+
+/* ============================================================================
+   UPTIME DISPLAY
+   ============================================================================ */
+
+.uptime-display {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-sm);
+}
+
+.uptime-value {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xl);
+  color: var(--text-primary);
+}
+
+.uptime-label {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+/* ============================================================================
+   SERVER INFO HEADER
+   ============================================================================ */
+
+.server-info-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-lg);
+  padding: var(--space-md);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+}
+
+.server-hostname {
+  font-family: var(--font-mono);
+  font-size: var(--text-lg);
+  color: var(--text-primary);
+}
+
+.server-meta {
+  display: flex;
+  gap: var(--space-lg);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.server-meta-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+/* ============================================================================
+   AUTO-REFRESH INDICATOR
+   ============================================================================ */
+
+.auto-refresh-indicator {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.auto-refresh-dot {
+  width: 6px;
+  height: 6px;
+  background: var(--status-success);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+/* ============================================================================
+   SECTION HEADERS
+   ============================================================================ */
+
+.server-section {
+  margin-bottom: var(--space-xl);
+}
+
+.server-section-title {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: var(--space-md);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.server-section-title::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border-subtle);
+}
+
+/* ============================================================================
+   PING TEST FORM
+   ============================================================================ */
+
+.ping-test-form {
+  display: flex;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+}
+
+.ping-test-input {
+  flex: 1;
+  max-width: 200px;
+  padding: var(--space-sm);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+.ping-test-input:focus {
+  outline: none;
+  border-color: var(--text-secondary);
+}
+
+.ping-result {
+  margin-top: var(--space-sm);
+  padding: var(--space-sm);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+}
+
+.ping-result.success {
+  color: var(--status-success);
+  border-color: var(--status-success);
+}
+
+.ping-result.error {
+  color: var(--status-error);
+  border-color: var(--status-error);
+}
+
