@@ -249,5 +249,43 @@ router.post('/:name/slot', async (req, res) => {
   }
 });
 
+// ============================================================================
+// SERVICE CLEANUP
+// ============================================================================
+
+/**
+ * POST /api/bots/:name/cleanup
+ * Clean up orphaned service files for a specific bot
+ */
+router.post('/:name/cleanup', async (req, res) => {
+  try {
+    const { name } = req.params;
+    
+    console.log(`Cleaning up orphaned services for bot '${name}'`);
+    const result = await chapterx.cleanupBotServices(name);
+    
+    res.json(result);
+  } catch (error) {
+    console.error('Error cleaning up bot services:', error);
+    res.status(400).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/bots/cleanup/all
+ * Clean up all orphaned service files across all bots
+ */
+router.post('/cleanup/all', async (req, res) => {
+  try {
+    console.log('Cleaning up all orphaned service files...');
+    const result = await chapterx.cleanupAllOrphanedServices();
+    
+    res.json(result);
+  } catch (error) {
+    console.error('Error cleaning up orphaned services:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
 
