@@ -113,7 +113,7 @@ const BCRYPT_ROUNDS = 12;
 // FILE PATHS
 // ============================================================================
 
-const USER_FILE = path.join(DATA_DIR, 'user.json');
+const USERS_FILE = path.join(DATA_DIR, 'users.json');
 const SESSIONS_FILE = path.join(DATA_DIR, 'sessions.json');
 const SLOTS_FILE = path.join(DATA_DIR, 'slots.json');
 
@@ -169,7 +169,7 @@ module.exports = {
   BCRYPT_ROUNDS,
   
   // Files
-  USER_FILE,
+  USERS_FILE,
   SESSIONS_FILE,
   SLOTS_FILE,
   

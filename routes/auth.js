@@ -4,7 +4,7 @@ const express = require('express');
 const router = express.Router();
 const config = require('../config');
 const { createSession, deleteSession } = require('../lib/auth/sessions');
-const { verifyUser, changePassword, getUserInfo, userExists } = require('../lib/auth/users');
+const { verifyUser, changePassword, getUserInfo, userExists, createUser, listUsers } = require('../lib/auth/users');
 const { requireAuth } = require('../middleware/require-auth');
 const { loginLimiter, actionLimiter } = require('../lib/security/rate-limit');
 
@@ -116,7 +116,7 @@ router.post('/change-password', requireAuth, actionLimiter.middleware(), async (
       return res.status(400).json({ error: 'Old and new password required' });
     }
     
-    await changePassword(oldPassword, newPassword);
+    await changePassword(req.username, oldPassword, newPassword);
     
     // Clear current session cookie (user will need to log in again)
     res.clearCookie(config.SESSION_COOKIE_NAME);
@@ -132,8 +132,36 @@ router.post('/change-password', requireAuth, actionLimiter.middleware(), async (
  * Get current user info
  */
 router.get('/user', requireAuth, (req, res) => {
-  const info = getUserInfo();
+  const info = getUserInfo(req.username);
   res.json(info);
+});
+
+/**
+ * GET /api/auth/users
+ * List all users (requires auth)
+ */
+router.get('/users', requireAuth, (req, res) => {
+  res.json(listUsers());
+});
+
+/**
+ * POST /api/auth/users
+ * Create a new user (requires auth)
+ * Only existing users can create new users
+ */
+router.post('/users', requireAuth, actionLimiter.middleware(), async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Username and password required' });
+    }
+    
+    const user = await createUser(username, password);
+    res.json({ success: true, user });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
 });
 
 module.exports = router;
