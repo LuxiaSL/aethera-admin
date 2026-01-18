@@ -6,26 +6,7 @@ const config = require('../config');
 const { createSession, deleteSession } = require('../lib/auth/sessions');
 const { verifyUser, changePassword, getUserInfo, userExists } = require('../lib/auth/users');
 const { requireAuth } = require('../middleware/require-auth');
-
-// Rate limiting for login attempts (simple in-memory)
-const loginAttempts = new Map();
-
-function checkLoginRateLimit(ip) {
-  const now = Date.now();
-  const attempts = loginAttempts.get(ip) || [];
-  
-  // Clean old attempts
-  const recent = attempts.filter(t => now - t < config.RATE_LIMIT_WINDOW);
-  loginAttempts.set(ip, recent);
-  
-  return recent.length < config.LOGIN_RATE_LIMIT_MAX;
-}
-
-function recordLoginAttempt(ip) {
-  const attempts = loginAttempts.get(ip) || [];
-  attempts.push(Date.now());
-  loginAttempts.set(ip, attempts);
-}
+const { loginLimiter, actionLimiter } = require('../lib/security/rate-limit');
 
 // ============================================================================
 // ROUTES
@@ -34,29 +15,25 @@ function recordLoginAttempt(ip) {
 /**
  * POST /api/auth/login
  * Login with username and password
+ * Rate limited: 5 attempts per 15 minutes per IP
  */
-router.post('/login', async (req, res) => {
+router.post('/login', loginLimiter.middleware(), async (req, res) => {
   try {
     const ip = req.ip || req.connection.remoteAddress;
-    
-    // Check rate limit
-    if (!checkLoginRateLimit(ip)) {
-      return res.status(429).json({ error: 'Too many login attempts. Try again later.' });
-    }
-    
     const { username, password } = req.body;
     
     if (!username || !password) {
-      recordLoginAttempt(ip);
       return res.status(400).json({ error: 'Username and password required' });
     }
     
     const user = await verifyUser(username, password);
     
     if (!user) {
-      recordLoginAttempt(ip);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
+    
+    // Successful login - reset rate limit for this IP
+    loginLimiter.reset(ip);
     
     // Create session
     const token = createSession(user.username);
@@ -129,8 +106,9 @@ router.get('/status', (req, res) => {
 /**
  * POST /api/auth/change-password
  * Change password (requires auth)
+ * Rate limited: 10 attempts per 5 minutes
  */
-router.post('/change-password', requireAuth, async (req, res) => {
+router.post('/change-password', requireAuth, actionLimiter.middleware(), async (req, res) => {
   try {
     const { oldPassword, newPassword } = req.body;
     
