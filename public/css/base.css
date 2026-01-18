@@ -265,3 +265,104 @@ button:disabled {
 .slide-up {
   animation: slideUp var(--transition-normal);
 }
+
+/* ============================================================================
+   LIVE STATUS INDICATOR
+   ============================================================================ */
+
+.live-status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-sm);
+  font-size: var(--text-xs);
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  border: 1px solid var(--border-subtle);
+  margin-right: var(--space-md);
+}
+
+.live-status-dot {
+  width: 6px;
+  height: 6px;
+  background: var(--text-muted);
+  transition: background-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.live-status.connected {
+  color: var(--status-success);
+  border-color: var(--status-success);
+}
+
+.live-status.connected .live-status-dot {
+  background-color: var(--status-success);
+  box-shadow: 0 0 8px var(--status-success);
+  animation: live-pulse 2s ease-in-out infinite;
+}
+
+.live-status.connecting,
+.live-status.reconnecting {
+  color: var(--status-warning);
+  border-color: var(--status-warning);
+}
+
+.live-status.connecting .live-status-dot,
+.live-status.reconnecting .live-status-dot {
+  background-color: var(--status-warning);
+  animation: live-blink 1s ease-in-out infinite;
+}
+
+.live-status.disconnected {
+  color: var(--text-muted);
+  border-color: var(--border-subtle);
+}
+
+.live-status.disconnected .live-status-dot {
+  background-color: var(--text-muted);
+}
+
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes live-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.2; }
+}
+
+/* ============================================================================
+   UPDATE PULSE ANIMATION
+   ============================================================================ */
+
+.pulse-update {
+  animation: value-update-pulse 0.6s ease-out;
+}
+
+@keyframes value-update-pulse {
+  0% {
+    background-color: rgba(74, 222, 128, 0.3);
+    box-shadow: 0 0 12px rgba(74, 222, 128, 0.4);
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: none;
+  }
+}
+
+/* Card-level update glow (for container updates) */
+.card-updated {
+  animation: card-update-glow 0.8s ease-out;
+}
+
+@keyframes card-update-glow {
+  0% {
+    box-shadow: 0 0 0 2px rgba(74, 222, 128, 0.4),
+                0 0 20px rgba(74, 222, 128, 0.2);
+  }
+  100% {
+    box-shadow: var(--glow-subtle);
+  }
+}

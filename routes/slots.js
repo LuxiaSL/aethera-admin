@@ -215,46 +215,6 @@ router.post('/:slot/npm-install', async (req, res) => {
   }
 });
 
-/**
- * GET /api/slots/:slot/diff
- * Get git diff for a slot (modified files and their changes)
- */
-router.get('/:slot/diff', async (req, res) => {
-  try {
-    const { slot } = req.params;
-    
-    const diff = await chapterx.gitDiff(slot);
-    res.json(diff);
-  } catch (error) {
-    console.error('Error getting slot diff:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-/**
- * POST /api/slots/:slot/discard
- * Discard all local changes in a slot
- */
-router.post('/:slot/discard', async (req, res) => {
-  try {
-    const { slot } = req.params;
-    
-    console.log(`Discarding changes for slot '${slot}'...`);
-    const result = await chapterx.gitDiscardChanges(slot);
-    
-    // Get updated status
-    const status = await chapterx.getSlotGitStatus(slot);
-    
-    res.json({
-      ...result,
-      status,
-    });
-  } catch (error) {
-    console.error('Error discarding changes:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
 module.exports = router;
 
 

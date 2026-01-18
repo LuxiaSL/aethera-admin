@@ -79,6 +79,10 @@
       </div>
       
       <div class="header-right">
+        <div class="live-status" id="liveStatus">
+          <span class="live-status-dot"></span>
+          <span class="live-status-text">Offline</span>
+        </div>
         <div class="user-info">
           <span>Logged in as</span>
           <span class="username" id="currentUser">-</span>
@@ -168,8 +172,8 @@
           <span class="bots-stat">Total: <span id="botsTotal" class="value">0</span></span>
           <span class="bots-stat">Running: <span id="botsRunning" class="value success">0</span></span>
         </div>
-        <button class="btn-secondary" onclick="refreshBots()">
-          🔄 Refresh
+        <button class="btn-secondary" onclick="forceRefreshBots()">
+          ⟳ Force Refresh
         </button>
       </div>
       
@@ -275,7 +279,7 @@
             <button id="aetheraStopBtn" class="btn-secondary" onclick="stopAethera()" style="display: none;">⏹️ Stop</button>
             <button id="aetheraRestartBtn" class="btn-secondary" onclick="restartAethera()">🔄 Restart</button>
             <button class="btn-secondary" onclick="viewAetheraLogs()">📜 View Logs</button>
-            <button class="btn-ghost" onclick="refreshAetheraStatus()">🔄 Refresh</button>
+            <button class="btn-ghost" onclick="forceRefreshServices()">⟳ Force Refresh</button>
           </div>
         </div>
       </div>
@@ -481,8 +485,8 @@
             <button id="gpuRestartBtn" class="btn btn-restart" onclick="restartGpu()">
               🔄 Restart
             </button>
-            <button class="btn btn-secondary" onclick="refreshDreamsStatus()">
-              🔄 Refresh Status
+            <button class="btn btn-secondary" onclick="forceRefreshDreams()">
+              ⟳ Force Refresh
             </button>
           </div>
           
@@ -534,7 +538,7 @@
           </div>
         </div>
         <div class="blog-toolbar-right">
-          <button class="btn-secondary" onclick="refreshBlogPosts()">🔄 Refresh</button>
+          <button class="btn-secondary" onclick="forceRefreshBlog()">⟳ Force Refresh</button>
           <button class="btn-primary" onclick="openPostEditor()">+ New Post</button>
         </div>
       </div>
@@ -706,10 +710,9 @@
             <h1 class="page-title">Server Monitoring</h1>
             <p class="page-subtitle">System metrics, logs, and diagnostics</p>
           </div>
-          <div class="auto-refresh-indicator">
-            <span class="auto-refresh-dot"></span>
-            <span>Auto-refresh: <span id="serverRefreshInterval">5s</span></span>
-          </div>
+          <button class="btn-secondary" onclick="forceRefreshServer()" title="Force immediate refresh">
+            ⟳ Force Refresh
+          </button>
         </div>
       </div>
       
@@ -928,6 +931,7 @@
 
   <!-- Scripts -->
   <script src="/js/api.js"></script>
+  <script src="/js/live-data.js"></script>
   <script src="/js/main.js"></script>
 </body>
 </html>

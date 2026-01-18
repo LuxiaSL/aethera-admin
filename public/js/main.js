@@ -20,7 +20,54 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   // Setup event listeners
   setupEventListeners();
+  
+  // Setup live status indicator
+  setupLiveStatusIndicator();
 });
+
+// ============================================================================
+// LIVE DATA INTEGRATION
+// ============================================================================
+
+/**
+ * Setup the live status indicator in the header
+ */
+function setupLiveStatusIndicator() {
+  streams.onStatusChange(updateLiveStatusIndicator);
+}
+
+/**
+ * Update the live status indicator based on connection state
+ * @param {'connected'|'connecting'|'reconnecting'|'disconnected'} status
+ * @param {string} [domain] - Current stream domain
+ */
+function updateLiveStatusIndicator(status, domain) {
+  const indicator = document.getElementById('liveStatus');
+  if (!indicator) return;
+  
+  const dot = indicator.querySelector('.live-status-dot');
+  const text = indicator.querySelector('.live-status-text');
+  
+  // Update class for styling
+  indicator.className = `live-status ${status}`;
+  
+  // Update text
+  switch (status) {
+    case 'connected':
+      text.textContent = 'Live';
+      break;
+    case 'connecting':
+      text.textContent = 'Connecting';
+      break;
+    case 'reconnecting':
+      text.textContent = 'Reconnecting';
+      break;
+    case 'disconnected':
+    default:
+      text.textContent = 'Offline';
+      break;
+  }
+}
 
 async function checkAuth() {
   try {
@@ -164,6 +211,9 @@ async function handleChangePassword(e) {
 // ============================================================================
 
 function navigateTo(page) {
+  // Disconnect any active stream when leaving a page
+  streams.disconnect();
+  
   // Update tabs
   document.querySelectorAll('.nav-tab').forEach(tab => {
     tab.classList.toggle('active', tab.dataset.page === page);
@@ -212,86 +262,127 @@ function navigateTo(page) {
 // ============================================================================
 
 async function loadDashboard() {
-  // Load bot stats
+  // Use live data stream
+  loadDashboardLive();
+}
+
+/**
+ * Load dashboard page with live SSE updates
+ */
+function loadDashboardLive() {
+  streams.connect('dashboard', (data) => {
+    renderDashboardData(data);
+  });
+}
+
+/**
+ * Render dashboard data from SSE stream
+ */
+function renderDashboardData(data) {
+  // Bots section
+  const bots = data.bots || {};
+  pulseUpdate('statBotsRunning', bots.running || 0);
+  
+  const botsList = bots.list || [];
+  if (botsList.length === 0) {
+    document.getElementById('dashboardBots').innerHTML = `
+      <div class="empty-state" style="padding: var(--space-lg);">
+        <p style="color: var(--text-secondary);">No bots configured yet</p>
+        <p style="font-size: var(--text-sm); color: var(--text-muted);">Add bot configs to /opt/aethera-server/bots/</p>
+      </div>
+    `;
+  } else {
+    document.getElementById('dashboardBots').innerHTML = botsList.map(bot => `
+      <div style="display: flex; align-items: center; gap: var(--space-md); padding: var(--space-sm) 0; border-bottom: 1px solid var(--border-subtle);">
+        <span class="status-dot ${bot.running ? 'running' : 'stopped'}"></span>
+        <span style="flex: 1;">${escapeHtml(bot.name)}</span>
+        <span style="font-size: var(--text-sm); color: ${bot.running ? 'var(--status-success)' : 'var(--text-muted)'};">
+          ${bot.running ? `Running (${bot.slot})` : 'Stopped'}
+        </span>
+      </div>
+    `).join('') + (bots.total > 5 ? `
+      <div style="padding: var(--space-sm); text-align: center;">
+        <a href="#" onclick="navigateTo('bots'); return false;" style="font-size: var(--text-sm);">View all ${bots.total} bots →</a>
+      </div>
+    ` : '');
+  }
+  
+  // Services section
+  const services = data.services || {};
+  const aethera = services.aethera || {};
+  const running = aethera.running || false;
+  const health = aethera.health || '';
+  
+  pulseUpdate('statServices', running ? '1/1' : '0/1');
+  
+  document.getElementById('dashboardServices').innerHTML = `
+    <div style="display: flex; align-items: center; gap: var(--space-md); padding: var(--space-sm) 0;">
+      <span class="status-dot ${running ? 'running' : 'stopped'}"></span>
+      <span style="flex: 1;">æthera</span>
+      <span style="color: ${running ? 'var(--status-success)' : 'var(--text-muted)'}; font-size: var(--text-sm);">
+        ${running ? 'Running' : 'Stopped'}${health === 'healthy' ? ' ✓' : health === 'unhealthy' ? ' ✗' : ''}
+      </span>
+    </div>
+  `;
+  
+  // Dreams section
+  const dreams = data.dreams || {};
+  const stateText = formatGpuState ? formatGpuState(dreams.state) : dreams.state;
+  pulseUpdate('statDreams', stateText);
+  const dreamsEl = document.getElementById('statDreams');
+  if (dreamsEl) {
+    dreamsEl.className = `stat-value ${dreams.state === 'running' ? 'success' : ''}`;
+  }
+  
+  // Blog section
+  const blog = data.blog || {};
+  pulseUpdate('statBlogPosts', blog.total || 0);
+}
+
+/**
+ * Force refresh dashboard (bypasses stream, immediate fetch)
+ */
+async function forceRefreshDashboard() {
+  showToast('Refreshing dashboard...', 'info');
   try {
-    const botsData = await api.bots.list();
+    // Fetch all data in parallel
+    const [botsData, aetheraData, dreamsData, blogStats] = await Promise.all([
+      api.bots.list().catch(() => ({ bots: [], running: 0 })),
+      api.services.aetheraStatus().catch(() => ({ running: false })),
+      api.dreams.status().catch(() => ({ state: 'unknown' })),
+      api.blog.stats().catch(() => ({ total: 0 })),
+    ]);
+    
     const bots = botsData.bots || [];
     const runningBots = bots.filter(b => b.running);
     
-    document.getElementById('statBotsRunning').textContent = runningBots.length;
+    renderDashboardData({
+      bots: {
+        total: bots.length,
+        running: runningBots.length,
+        list: bots.slice(0, 5).map(b => ({
+          name: b.name,
+          running: b.running,
+          slot: b.slot,
+        })),
+      },
+      services: {
+        aethera: {
+          running: aetheraData.running || false,
+          health: aetheraData.health || '',
+        },
+      },
+      dreams: {
+        state: dreamsData.state || 'unknown',
+      },
+      blog: {
+        total: blogStats.total || 0,
+      },
+    });
     
-    // Render bots overview
-    if (bots.length === 0) {
-      document.getElementById('dashboardBots').innerHTML = `
-        <div class="empty-state" style="padding: var(--space-lg);">
-          <p style="color: var(--text-secondary);">No bots configured yet</p>
-          <p style="font-size: var(--text-sm); color: var(--text-muted);">Add bot configs to /opt/aethera-server/bots/</p>
-        </div>
-      `;
-    } else {
-      document.getElementById('dashboardBots').innerHTML = bots.slice(0, 5).map(bot => `
-        <div style="display: flex; align-items: center; gap: var(--space-md); padding: var(--space-sm) 0; border-bottom: 1px solid var(--border-subtle);">
-          <span class="status-dot ${bot.running ? 'running' : 'stopped'}"></span>
-          <span style="flex: 1;">${escapeHtml(bot.name)}</span>
-          <span style="font-size: var(--text-sm); color: ${bot.running ? 'var(--status-success)' : 'var(--text-muted)'};">
-            ${bot.running ? `Running (${bot.slot})` : 'Stopped'}
-          </span>
-        </div>
-      `).join('') + (bots.length > 5 ? `
-        <div style="padding: var(--space-sm); text-align: center;">
-          <a href="#" onclick="navigateTo('bots'); return false;" style="font-size: var(--text-sm);">View all ${bots.length} bots →</a>
-        </div>
-      ` : '');
-    }
-  } catch (e) {
-    console.error('Error loading bot stats:', e);
-    document.getElementById('statBotsRunning').textContent = '-';
-  }
-  
-  // Load aethera status for dashboard
-  try {
-    const aetheraData = await api.services.aetheraStatus();
-    const running = aetheraData.running;
-    const health = aetheraData.health;
-    
-    document.getElementById('statServices').textContent = running ? '1/1' : '0/1';
-    
-    // Services overview
-    document.getElementById('dashboardServices').innerHTML = `
-      <div style="display: flex; align-items: center; gap: var(--space-md); padding: var(--space-sm) 0;">
-        <span class="status-dot ${running ? 'running' : 'stopped'}"></span>
-        <span style="flex: 1;">æthera</span>
-        <span style="color: ${running ? 'var(--status-success)' : 'var(--text-muted)'}; font-size: var(--text-sm);">
-          ${running ? 'Running' : 'Stopped'}${health === 'healthy' ? ' ✓' : health === 'unhealthy' ? ' ✗' : ''}
-        </span>
-      </div>
-    `;
-  } catch (e) {
-    console.error('Error loading aethera status:', e);
-    document.getElementById('statServices').textContent = '-';
-    document.getElementById('dashboardServices').innerHTML = `
-      <div style="color: var(--text-muted); padding: var(--space-sm);">Unable to get status</div>
-    `;
-  }
-  
-  // Load dreams status for dashboard
-  try {
-    const dreamsData = await api.dreams.status();
-    const stateText = formatGpuState ? formatGpuState(dreamsData.state) : dreamsData.state;
-    document.getElementById('statDreams').textContent = stateText;
-    document.getElementById('statDreams').className = `stat-value ${dreamsData.state === 'running' ? 'success' : ''}`;
-  } catch (e) {
-    console.error('Error loading dreams status:', e);
-    document.getElementById('statDreams').textContent = '-';
-  }
-  
-  // Blog posts
-  try {
-    const blogStats = await api.blog.stats();
-    document.getElementById('statBlogPosts').textContent = blogStats.total || 0;
-  } catch (e) {
-    console.error('Error loading blog stats:', e);
-    document.getElementById('statBlogPosts').textContent = '-';
+    showToast('Dashboard refreshed', 'success');
+  } catch (error) {
+    showToast(`Refresh failed: ${error.message}`, 'error');
   }
 }
 
@@ -306,22 +397,46 @@ let currentLogsBotName = null;
 let currentConfigBotName = null;
 
 async function loadBots() {
+  // Use live data stream
+  loadBotsLive();
+}
+
+/**
+ * Load bots page with live SSE updates
+ */
+function loadBotsLive() {
+  streams.connect('bots', (data) => {
+    currentBots = data.bots || [];
+    currentSlots = data.slots || {};
+    currentSystemd = data.systemd || { available: false };
+    
+    // Update stats with pulse animation
+    pulseUpdate('botsTotal', data.count || 0);
+    pulseUpdate('botsRunning', data.running || 0);
+    
+    // Render UI
+    renderSlotsInfo();
+    renderBotsGrid();
+  });
+}
+
+/**
+ * Force refresh bots (bypasses stream, immediate fetch)
+ */
+async function forceRefreshBots() {
+  showToast('Refreshing bots...', 'info');
   try {
     const data = await api.bots.list();
     currentBots = data.bots || [];
     currentSlots = data.slots || {};
     currentSystemd = data.systemd || { available: false };
     
-    // Update stats
-    document.getElementById('botsTotal').textContent = data.count || 0;
-    document.getElementById('botsRunning').textContent = data.running || 0;
+    pulseUpdate('botsTotal', data.count || 0);
+    pulseUpdate('botsRunning', data.running || 0);
     
-    // Render slots info
     renderSlotsInfo();
-    
-    // Render bots grid
     renderBotsGrid();
-    
+    showToast('Bots refreshed', 'success');
   } catch (error) {
     console.error('Error loading bots:', error);
     showToast('Failed to load bots', 'error');
@@ -545,8 +660,8 @@ async function forceStopBot(botName) {
 }
 
 async function refreshBots() {
-  showToast('Refreshing bots...', 'info');
-  await loadBots();
+  // Alias for forceRefreshBots for backwards compatibility
+  await forceRefreshBots();
 }
 
 // Logs modal
@@ -642,6 +757,7 @@ function escapeHtml(str) {
 // Make functions global
 window.loadBots = loadBots;
 window.refreshBots = refreshBots;
+window.forceRefreshBots = forceRefreshBots;
 window.startBot = startBot;
 window.stopBot = stopBot;
 window.restartBot = restartBot;
@@ -663,11 +779,35 @@ window.closeConfigModal = closeConfigModal;
 let aetheraStatus = null;
 
 async function loadServices() {
-  // Load aethera status
-  await refreshAetheraStatus();
-  
-  // Load slot status
-  await loadSlots();
+  // Use live data stream
+  loadServicesLive();
+}
+
+/**
+ * Load services page with live SSE updates
+ */
+function loadServicesLive() {
+  streams.connect('services', (data) => {
+    aetheraStatus = data.aethera || null;
+    currentSlots = data.slots || {};
+    
+    renderAetheraStatus();
+    renderSlots();
+  });
+}
+
+/**
+ * Force refresh services (bypasses stream, immediate fetch)
+ */
+async function forceRefreshServices() {
+  showToast('Refreshing services...', 'info');
+  try {
+    await refreshAetheraStatus();
+    await loadSlots();
+    showToast('Services refreshed', 'success');
+  } catch (error) {
+    showToast(`Refresh failed: ${error.message}`, 'error');
+  }
 }
 
 async function refreshAetheraStatus() {
@@ -1199,6 +1339,7 @@ async function discardSlotChanges() {
 
 // Make services functions global
 window.loadServices = loadServices;
+window.forceRefreshServices = forceRefreshServices;
 window.refreshAetheraStatus = refreshAetheraStatus;
 window.startAethera = startAethera;
 window.stopAethera = stopAethera;
@@ -1222,14 +1363,20 @@ window.copyDiffToClipboard = copyDiffToClipboard;
 // ============================================================================
 
 let dreamsStatus = null;
-let dreamsRefreshInterval = null;
 
 async function loadDreams() {
-  // Start auto-refresh
-  startDreamsAutoRefresh();
-  
-  // Load initial status
-  await refreshDreamsStatus();
+  // Use live data stream instead of polling
+  loadDreamsLive();
+}
+
+/**
+ * Load dreams page with live SSE updates
+ */
+function loadDreamsLive() {
+  streams.connect('dreams', (data) => {
+    dreamsStatus = data;
+    renderDreamsStatus();
+  });
 }
 
 async function refreshDreamsStatus() {
@@ -1282,11 +1429,11 @@ function renderDreamsStatus() {
     }
   }
   
-  // Cost display
+  // Cost display - use pulse for frequently changing values
   const cost = dreamsStatus.cost || {};
-  document.getElementById('gpuCost').textContent = `$${(cost.estimatedSessionCost || 0).toFixed(2)}`;
+  pulseUpdate('gpuCost', `$${(cost.estimatedSessionCost || 0).toFixed(2)}`);
   document.getElementById('gpuRate').textContent = (cost.hourlyRate || 0.19).toFixed(2);
-  document.getElementById('gpuUptime').textContent = cost.uptimeFormatted || '0s';
+  pulseUpdate('gpuUptime', cost.uptimeFormatted || '0s');
   
   // GPU stats
   const aethera = dreamsStatus.aethera || {};
@@ -1294,11 +1441,10 @@ function renderDreamsStatus() {
   const generation = aethera.generation || {};
   const viewers = aethera.viewers || {};
   
-  document.getElementById('gpuStateValue').textContent = formatGpuState(gpu.state || dreamsStatus.state);
-  document.getElementById('gpuViewers').textContent = 
-    (viewers.websocket_count || 0) + (viewers.api_active ? ' (+API)' : '');
-  document.getElementById('gpuFrames').textContent = generation.frame_count || 0;
-  document.getElementById('gpuFps').textContent = generation.fps ? generation.fps.toFixed(1) : '—';
+  pulseUpdate('gpuStateValue', formatGpuState(gpu.state || dreamsStatus.state));
+  pulseUpdate('gpuViewers', (viewers.websocket_count || 0) + (viewers.api_active ? ' (+API)' : ''));
+  pulseUpdate('gpuFrames', generation.frame_count || 0);
+  pulseUpdate('gpuFps', generation.fps ? generation.fps.toFixed(1) : '—');
   
   // Aethera info
   if (aethera.error) {
@@ -1313,7 +1459,7 @@ function renderDreamsStatus() {
   document.getElementById('aetheraWsViewers').textContent = viewers.websocket_count || 0;
   document.getElementById('aetheraApiActive').textContent = viewers.api_active ? 'Yes' : 'No';
   
-  // RunPod info
+  // RunPod info - use pulse for changing values
   const runpod = dreamsStatus.runpod || {};
   if (runpod.error) {
     document.getElementById('runpodWorkers').textContent = '—';
@@ -1321,10 +1467,10 @@ function renderDreamsStatus() {
     document.getElementById('runpodQueued').textContent = '—';
     document.getElementById('runpodCompleted').textContent = '—';
   } else {
-    document.getElementById('runpodWorkers').textContent = runpod.workers || 0;
-    document.getElementById('runpodRunning').textContent = runpod.workersRunning || 0;
-    document.getElementById('runpodQueued').textContent = runpod.jobsInQueue || 0;
-    document.getElementById('runpodCompleted').textContent = runpod.jobsCompleted || 0;
+    pulseUpdate('runpodWorkers', runpod.workers || 0);
+    pulseUpdate('runpodRunning', runpod.workersRunning || 0);
+    pulseUpdate('runpodQueued', runpod.jobsInQueue || 0);
+    pulseUpdate('runpodCompleted', runpod.jobsCompleted || 0);
   }
   
   // Update action buttons
@@ -1438,22 +1584,18 @@ async function restartGpu() {
   }
 }
 
-function startDreamsAutoRefresh() {
-  // Clear any existing interval
-  if (dreamsRefreshInterval) {
-    clearInterval(dreamsRefreshInterval);
+/**
+ * Force refresh dreams status (bypasses stream, immediate fetch)
+ */
+async function forceRefreshDreams() {
+  showToast('Refreshing dreams status...', 'info');
+  try {
+    dreamsStatus = await api.dreams.status();
+    renderDreamsStatus();
+    showToast('Status refreshed', 'success');
+  } catch (error) {
+    showToast(`Refresh failed: ${error.message}`, 'error');
   }
-  
-  // Refresh every 10 seconds when on dreams page
-  dreamsRefreshInterval = setInterval(() => {
-    if (state.currentPage === 'dreams') {
-      refreshDreamsStatus();
-    } else {
-      // Stop auto-refresh when not on dreams page
-      clearInterval(dreamsRefreshInterval);
-      dreamsRefreshInterval = null;
-    }
-  }, 10000);
 }
 
 function openDreamsViewer(event) {
@@ -1472,6 +1614,7 @@ function openRunpodDashboard(event) {
 // Make dreams functions global
 window.loadDreams = loadDreams;
 window.refreshDreamsStatus = refreshDreamsStatus;
+window.forceRefreshDreams = forceRefreshDreams;
 window.startGpu = startGpu;
 window.stopGpu = stopGpu;
 window.restartGpu = restartGpu;
@@ -1508,11 +1651,39 @@ async function loadBlog() {
   // Setup filter tabs
   setupBlogFilterTabs();
   
-  // Load posts
+  // Load posts (initial load)
   await loadBlogPosts();
   
-  // Load stats
+  // Use live data stream for stats updates
+  loadBlogLive();
+}
+
+/**
+ * Load blog page with live SSE updates for stats
+ * Note: Posts are loaded on-demand via API, only stats are streamed
+ */
+function loadBlogLive() {
+  streams.connect('blog', (data) => {
+    if (data.available && data.stats) {
+      // Update stats with pulse animation
+      pulseUpdate('blogTotal', data.stats.total || 0);
+      pulseUpdate('blogPublished', data.stats.published || 0);
+      pulseUpdate('blogDrafts', data.stats.drafts || 0);
+      
+      // Store for local use
+      blogStats = data.stats;
+    }
+  });
+}
+
+/**
+ * Force refresh blog (bypasses stream, immediate fetch)
+ */
+async function forceRefreshBlog() {
+  showToast('Refreshing blog...', 'info');
   await loadBlogStats();
+  await loadBlogPosts();
+  showToast('Blog refreshed', 'success');
 }
 
 function setupBlogFilterTabs() {
@@ -1664,9 +1835,8 @@ function formatRelativeTime(dateStr) {
 }
 
 async function refreshBlogPosts() {
-  showToast('Refreshing...', 'info');
-  await loadBlogStats();
-  await loadBlogPosts();
+  // Alias for forceRefreshBlog for backwards compatibility
+  await forceRefreshBlog();
 }
 
 // ============================================================================
@@ -1868,6 +2038,7 @@ function closeDeleteModal(event) {
 // Make blog functions global
 window.loadBlog = loadBlog;
 window.refreshBlogPosts = refreshBlogPosts;
+window.forceRefreshBlog = forceRefreshBlog;
 window.loadBlogPage = loadBlogPage;
 window.openPostEditor = openPostEditor;
 window.editPost = editPost;
@@ -1891,17 +2062,25 @@ async function loadIRC() {
 // ============================================================================
 
 let serverMetrics = null;
-let serverRefreshInterval = null;
 
 async function loadServer() {
-  // Start auto-refresh
-  startServerAutoRefresh();
+  // Use live data stream instead of polling
+  loadServerLive();
+}
+
+/**
+ * Load server page with live SSE updates
+ */
+function loadServerLive() {
+  streams.connect('server', (data) => {
+    serverMetrics = data;
+    renderServerMetrics();
+  });
   
-  // Load initial data
-  await refreshServerMetrics();
-  await refreshNetworkStatus();
-  await refreshLogSizes();
-  await refreshServiceHealth();
+  // These don't need to be live (user-triggered or less frequent)
+  refreshNetworkStatus();
+  refreshLogSizes();
+  refreshServiceHealth();
 }
 
 async function refreshServerMetrics() {
@@ -1922,20 +2101,32 @@ function renderServerMetrics() {
   document.getElementById('serverPlatform').textContent = 
     `${serverMetrics.platform || '—'} (${serverMetrics.arch || '—'})`;
   
-  // CPU
+  // CPU - use pulseUpdate for the percentage value
   const cpu = serverMetrics.cpu || {};
   const cpuPercent = cpu.percent ?? 0;
-  document.getElementById('cpuPercent').innerHTML = `${cpuPercent}<span class="metric-card-unit">%</span>`;
+  const cpuEl = document.getElementById('cpuPercent');
+  const oldCpuValue = cpuEl.textContent.replace('%', '');
+  cpuEl.innerHTML = `${cpuPercent}<span class="metric-card-unit">%</span>`;
+  if (oldCpuValue !== String(cpuPercent)) {
+    cpuEl.classList.add('pulse-update');
+    setTimeout(() => cpuEl.classList.remove('pulse-update'), 600);
+  }
   document.getElementById('cpuCores').textContent = `${cpu.cores || '—'} cores`;
   
   const cpuBar = document.getElementById('cpuBar');
   cpuBar.style.width = `${cpuPercent}%`;
   cpuBar.className = `metric-bar-fill ${getBarClass(cpuPercent)}`;
   
-  // Memory
+  // Memory - use pulseUpdate for the percentage value
   const mem = serverMetrics.memory || {};
   const memPercent = mem.percent ?? 0;
-  document.getElementById('memPercent').innerHTML = `${memPercent}<span class="metric-card-unit">%</span>`;
+  const memEl = document.getElementById('memPercent');
+  const oldMemValue = memEl.textContent.replace('%', '');
+  memEl.innerHTML = `${memPercent}<span class="metric-card-unit">%</span>`;
+  if (oldMemValue !== String(memPercent)) {
+    memEl.classList.add('pulse-update');
+    setTimeout(() => memEl.classList.remove('pulse-update'), 600);
+  }
   document.getElementById('memUsage').textContent = 
     `${mem.usedFormatted || '—'} / ${mem.totalFormatted || '—'}`;
   
@@ -1943,11 +2134,11 @@ function renderServerMetrics() {
   memBar.style.width = `${memPercent}%`;
   memBar.className = `metric-bar-fill ${getBarClass(memPercent)}`;
   
-  // Load averages
+  // Load averages - use pulseUpdate
   const load = serverMetrics.load || {};
-  document.getElementById('load1').textContent = load.load1 || '—';
-  document.getElementById('load5').textContent = load.load5 || '—';
-  document.getElementById('load15').textContent = load.load15 || '—';
+  pulseUpdate('load1', load.load1 || '—');
+  pulseUpdate('load5', load.load5 || '—');
+  pulseUpdate('load15', load.load15 || '—');
   
   // Disk table
   renderDiskTable(serverMetrics.disk || []);
@@ -2198,27 +2389,26 @@ function renderServiceHealth(services) {
   `).join('');
 }
 
-function startServerAutoRefresh() {
-  // Clear any existing interval
-  if (serverRefreshInterval) {
-    clearInterval(serverRefreshInterval);
+// startServerAutoRefresh removed - now using SSE via loadServerLive()
+
+/**
+ * Force refresh server metrics (bypasses stream, immediate fetch)
+ */
+async function forceRefreshServer() {
+  showToast('Refreshing server metrics...', 'info');
+  try {
+    serverMetrics = await api.server.metrics();
+    renderServerMetrics();
+    showToast('Metrics refreshed', 'success');
+  } catch (error) {
+    showToast(`Refresh failed: ${error.message}`, 'error');
   }
-  
-  // Refresh every 5 seconds when on server page
-  serverRefreshInterval = setInterval(() => {
-    if (state.currentPage === 'server') {
-      refreshServerMetrics();
-    } else {
-      // Stop auto-refresh when not on server page
-      clearInterval(serverRefreshInterval);
-      serverRefreshInterval = null;
-    }
-  }, 5000);
 }
 
 // Make server functions global
 window.loadServer = loadServer;
 window.refreshServerMetrics = refreshServerMetrics;
+window.forceRefreshServer = forceRefreshServer;
 window.refreshNetworkStatus = refreshNetworkStatus;
 window.runPingTest = runPingTest;
 window.refreshLogSizes = refreshLogSizes;
@@ -2264,4 +2454,6 @@ function showToast(message, type = 'info') {
 window.togglePassword = togglePassword;
 window.logout = logout;
 window.showToast = showToast;
+window.loadDashboard = loadDashboard;
+window.forceRefreshDashboard = forceRefreshDashboard;
 
