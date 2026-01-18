@@ -527,8 +527,8 @@ function renderBotsGrid() {
       
       ${!bot.running && canControl && Object.keys(currentSlots).length > 0 ? `
         <div class="slot-selector">
-          ${Object.keys(currentSlots).map((slotName, idx) => `
-            <button class="slot-btn ${idx === 0 ? 'active' : ''}" data-slot="${slotName}" 
+          ${Object.keys(currentSlots).map((slotName) => `
+            <button class="slot-btn ${slotName === getDefaultSlotForBot(bot) ? 'active' : ''}" data-slot="${slotName}" 
                     onclick="selectSlot('${bot.name}', '${slotName}', this)">${slotName}</button>
           `).join('')}
         </div>
@@ -561,10 +561,33 @@ function selectSlot(botName, slot, btn) {
 }
 
 function getSelectedSlot(botName) {
+  // First check if user has manually selected a slot this session
   if (selectedSlots[botName]) {
     return selectedSlots[botName];
   }
-  // Default to first available slot, or 'main' as fallback
+  
+  // Then check if the bot has a stored preferred slot from the backend
+  const bot = currentBots.find(b => b.name === botName);
+  if (bot && bot.preferredSlot && currentSlots[bot.preferredSlot]) {
+    return bot.preferredSlot;
+  }
+  
+  // Default to 'main' if it exists, otherwise first available slot
+  const slotNames = Object.keys(currentSlots);
+  return slotNames.includes('main') ? 'main' : (slotNames[0] || 'main');
+}
+
+/**
+ * Get the default slot for a bot (what should be highlighted in UI)
+ * This should match what getSelectedSlot returns for consistency
+ */
+function getDefaultSlotForBot(bot) {
+  // Check stored preference from backend
+  if (bot.preferredSlot && currentSlots[bot.preferredSlot]) {
+    return bot.preferredSlot;
+  }
+  
+  // Default to 'main' if it exists, otherwise first available slot
   const slotNames = Object.keys(currentSlots);
   return slotNames.includes('main') ? 'main' : (slotNames[0] || 'main');
 }
@@ -764,6 +787,7 @@ window.restartBot = restartBot;
 window.forceStopBot = forceStopBot;
 window.toggleBotMenu = toggleBotMenu;
 window.selectSlot = selectSlot;
+window.getDefaultSlotForBot = getDefaultSlotForBot;
 window.viewBotLogs = viewBotLogs;
 window.refreshLogs = refreshLogs;
 window.scrollLogsToBottom = scrollLogsToBottom;
