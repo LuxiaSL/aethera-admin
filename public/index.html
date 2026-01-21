@@ -1002,6 +1002,43 @@
           </div>
         </div>
       </div>
+      
+      <!-- Process Management Section -->
+      <div class="server-section">
+        <h2 class="server-section-title">🧟 Process Management</h2>
+        <p style="color: var(--text-secondary); font-size: var(--text-sm); margin-bottom: var(--space-md);">
+          Monitor and clean up zombie processes spawned by the admin panel.
+        </p>
+        
+        <div class="process-management-card">
+          <div class="process-stats-grid">
+            <div class="process-stat-item">
+              <span class="process-stat-label">Zombie Processes</span>
+              <span class="process-stat-value success" id="zombieCount">0</span>
+            </div>
+            <div class="process-stat-item">
+              <span class="process-stat-label">Active Child Processes</span>
+              <span class="process-stat-value" id="activeChildProcs">0</span>
+            </div>
+          </div>
+          
+          <div class="process-actions">
+            <button id="zombieCleanupBtn" class="btn-secondary" onclick="cleanupZombies()" disabled>
+              🧹 Cleanup Zombies
+            </button>
+            <button class="btn-ghost" onclick="refreshProcessInfo()">
+              ⟳ Refresh
+            </button>
+          </div>
+          
+          <div class="process-info-note">
+            <span>ℹ️</span>
+            <span>Zombie processes are child processes that have exited but haven't been reaped. 
+                  They don't consume CPU or memory but can indicate a cleanup issue. 
+                  The admin panel has automatic cleanup, but you can force it here.</span>
+          </div>
+        </div>
+      </div>
     </div>
     
     <!-- Settings Page -->

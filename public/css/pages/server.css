@@ -538,3 +538,70 @@
   border-color: var(--status-error);
 }
 
+/* ============================================================================
+   PROCESS MANAGEMENT
+   ============================================================================ */
+
+.process-management-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  padding: var(--space-lg);
+}
+
+.process-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-lg);
+  margin-bottom: var(--space-lg);
+}
+
+.process-stat-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.process-stat-label {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.process-stat-value {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xl);
+  color: var(--text-primary);
+  font-weight: normal;
+}
+
+.process-stat-value.success {
+  color: var(--status-success);
+}
+
+.process-stat-value.warning {
+  color: var(--status-warning);
+}
+
+.process-stat-value.error {
+  color: var(--status-error);
+}
+
+.process-actions {
+  display: flex;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-lg);
+}
+
+.process-info-note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+

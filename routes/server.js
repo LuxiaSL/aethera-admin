@@ -8,6 +8,7 @@ const server = require('../lib/services/server');
 const aethera = require('../lib/services/aethera');
 const chapterx = require('../lib/services/chapterx');
 const systemd = require('../lib/systemd');
+const { getZombieCount, cleanupZombies, getActiveProcessCount } = require('../lib/utils');
 
 // All routes require authentication
 router.use(requireAuth);
@@ -263,6 +264,52 @@ router.get('/services', async (req, res) => {
     });
   } catch (error) {
     console.error('Error getting service statuses:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================================================
+// PROCESS / ZOMBIE MANAGEMENT
+// ============================================================================
+
+/**
+ * GET /api/server/processes
+ * Get process info (active child processes, zombie count)
+ */
+router.get('/processes', async (req, res) => {
+  try {
+    const zombies = await getZombieCount();
+    const activeProcesses = getActiveProcessCount();
+    
+    res.json({
+      adminPid: process.pid,
+      activeChildProcesses: activeProcesses,
+      zombies: zombies.count,
+      zombiePids: zombies.pids,
+    });
+  } catch (error) {
+    console.error('Error getting process info:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/server/processes/cleanup
+ * Force cleanup of zombie processes
+ */
+router.post('/processes/cleanup', async (req, res) => {
+  try {
+    console.log('[Server] Manual zombie cleanup requested');
+    const result = await cleanupZombies();
+    
+    console.log(`[Server] Zombie cleanup: ${result.before} -> ${result.after} (cleaned ${result.cleaned})`);
+    
+    res.json({
+      success: true,
+      ...result,
+    });
+  } catch (error) {
+    console.error('Error cleaning up zombies:', error);
     res.status(500).json({ error: error.message });
   }
 });

@@ -592,6 +592,22 @@ const api = {
     async services() {
       return api.request('/server/services');
     },
+    
+    /**
+     * Get process info (zombies, active child processes)
+     */
+    async processes() {
+      return api.request('/server/processes');
+    },
+    
+    /**
+     * Force cleanup of zombie processes
+     */
+    async cleanupZombies() {
+      return api.request('/server/processes/cleanup', {
+        method: 'POST',
+      });
+    },
   },
 };
 

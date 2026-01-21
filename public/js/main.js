@@ -2579,6 +2579,7 @@ function loadServerLive() {
   refreshNetworkStatus();
   refreshLogSizes();
   refreshServiceHealth();
+  refreshProcessInfo();
 }
 
 async function refreshServerMetrics() {
@@ -2834,6 +2835,54 @@ async function refreshServiceHealth() {
   }
 }
 
+async function refreshProcessInfo() {
+  try {
+    const info = await api.server.processes();
+    renderProcessInfo(info);
+  } catch (error) {
+    console.error('Error loading process info:', error);
+  }
+}
+
+function renderProcessInfo(info) {
+  const zombieCount = document.getElementById('zombieCount');
+  const activeProcs = document.getElementById('activeChildProcs');
+  const cleanupBtn = document.getElementById('zombieCleanupBtn');
+  
+  if (zombieCount) {
+    pulseUpdate('zombieCount', info.zombies || 0);
+    zombieCount.className = `process-stat-value ${info.zombies > 0 ? 'warning' : 'success'}`;
+  }
+  
+  if (activeProcs) {
+    pulseUpdate('activeChildProcs', info.activeChildProcesses || 0);
+  }
+  
+  if (cleanupBtn) {
+    cleanupBtn.disabled = (info.zombies || 0) === 0;
+  }
+}
+
+async function cleanupZombies() {
+  try {
+    showToast('Cleaning up zombie processes...', 'info');
+    const result = await api.server.cleanupZombies();
+    
+    if (result.cleaned > 0) {
+      showToast(`Cleaned ${result.cleaned} zombie process${result.cleaned > 1 ? 'es' : ''}`, 'success');
+    } else if (result.before === 0) {
+      showToast('No zombie processes to clean', 'info');
+    } else {
+      showToast(`${result.after} zombie${result.after > 1 ? 's' : ''} remaining (may need admin restart)`, 'warning');
+    }
+    
+    // Refresh process info
+    await refreshProcessInfo();
+  } catch (error) {
+    showToast(`Cleanup failed: ${error.message}`, 'error');
+  }
+}
+
 function renderServiceHealth(services) {
   const grid = document.getElementById('servicesHealthGrid');
   const items = [];
@@ -2913,6 +2962,8 @@ window.refreshLogSizes = refreshLogSizes;
 window.trimJournalLogs = trimJournalLogs;
 window.pruneDockerSystem = pruneDockerSystem;
 window.refreshServiceHealth = refreshServiceHealth;
+window.refreshProcessInfo = refreshProcessInfo;
+window.cleanupZombies = cleanupZombies;
 
 // ============================================================================
 // UTILITIES
