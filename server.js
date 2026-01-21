@@ -10,6 +10,7 @@ const cookieParser = require('cookie-parser');
 const config = require('./config');
 const { loadSessions } = require('./lib/auth/sessions');
 const { userExists, createUser } = require('./lib/auth/users');
+const usage = require('./lib/services/usage');
 
 // Route modules
 const authRoutes = require('./routes/auth');
@@ -20,6 +21,7 @@ const dreamsRoutes = require('./routes/dreams');
 const blogRoutes = require('./routes/blog');
 const serverRoutes = require('./routes/server');
 const streamRoutes = require('./routes/stream');
+const usageRoutes = require('./routes/usage');
 
 const app = express();
 
@@ -48,6 +50,7 @@ app.use('/api/dreams', dreamsRoutes);
 app.use('/api/blog', blogRoutes);
 app.use('/api/server', serverRoutes);
 app.use('/api/stream', streamRoutes);
+app.use('/api/usage', usageRoutes);
 
 // Placeholder routes - will be implemented in later phases
 // app.use('/api/irc', require('./routes/irc'));
@@ -88,6 +91,10 @@ async function startup() {
   // Load sessions from file
   loadSessions();
   console.log('  ✓ Sessions loaded');
+  
+  // Initialize usage database
+  usage.initDB();
+  console.log('  ✓ Usage database initialized');
   
   // Check if user exists, if not create default admin
   if (!userExists()) {

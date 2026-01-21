@@ -337,6 +337,20 @@ function renderDashboardData(data) {
   // Blog section
   const blog = data.blog || {};
   pulseUpdate('statBlogPosts', blog.total || 0);
+  
+  // Usage section
+  const usage = data.usage || {};
+  if (usage.today) {
+    const todayCost = usage.today.cost || 0;
+    const costDisplay = todayCost > 0 ? `$${todayCost.toFixed(2)}` : '$0.00';
+    pulseUpdate('statTodayCost', costDisplay);
+    
+    // Update class based on cost
+    const costEl = document.getElementById('statTodayCost');
+    if (costEl) {
+      costEl.className = `stat-value ${todayCost > 1 ? 'warning' : todayCost > 0 ? '' : 'success'}`;
+    }
+  }
 }
 
 /**
@@ -346,11 +360,12 @@ async function forceRefreshDashboard() {
   showToast('Refreshing dashboard...', 'info');
   try {
     // Fetch all data in parallel
-    const [botsData, aetheraData, dreamsData, blogStats] = await Promise.all([
+    const [botsData, aetheraData, dreamsData, blogStats, usageData] = await Promise.all([
       api.bots.list().catch(() => ({ bots: [], running: 0 })),
       api.services.aetheraStatus().catch(() => ({ running: false })),
       api.dreams.status().catch(() => ({ state: 'unknown' })),
       api.blog.stats().catch(() => ({ total: 0 })),
+      api.usage.summary('day').catch(() => ({ totals: {} })),
     ]);
     
     const bots = botsData.bots || [];
@@ -378,6 +393,12 @@ async function forceRefreshDashboard() {
       blog: {
         total: blogStats.total || 0,
       },
+      usage: {
+        today: {
+          cost: usageData.totals?.total_cost_usd || 0,
+          requests: usageData.totals?.total_requests || 0,
+        },
+      },
     });
     
     showToast('Dashboard refreshed', 'success');
@@ -397,8 +418,12 @@ let currentLogsBotName = null;
 let currentConfigBotName = null;
 
 async function loadBots() {
-  // Use live data stream
-  loadBotsLive();
+  // Load the appropriate sub-tab based on current state
+  if (currentBotsSubtab === 'usage') {
+    loadUsageLive();
+  } else {
+    loadBotsLive();
+  }
 }
 
 /**
@@ -806,6 +831,278 @@ window.closeLogsModal = closeLogsModal;
 window.editBotConfig = editBotConfig;
 window.saveConfig = saveConfig;
 window.closeConfigModal = closeConfigModal;
+
+// ============================================================================
+// BOTS SUB-TAB SWITCHING
+// ============================================================================
+
+let currentBotsSubtab = 'management';
+
+function switchBotsSubtab(subtab) {
+  // Disconnect current stream
+  streams.disconnect();
+  
+  currentBotsSubtab = subtab;
+  
+  // Update tab buttons
+  document.querySelectorAll('.bots-sub-tab').forEach(tab => {
+    tab.classList.toggle('active', tab.dataset.subtab === subtab);
+  });
+  
+  // Update content panels
+  document.querySelectorAll('.bots-subtab-content').forEach(content => {
+    content.classList.remove('active');
+  });
+  const panel = document.getElementById(`bots-subtab-${subtab}`);
+  if (panel) {
+    panel.classList.add('active');
+  }
+  
+  // Load appropriate data
+  if (subtab === 'management') {
+    loadBotsLive();
+  } else if (subtab === 'usage') {
+    loadUsageLive();
+  }
+}
+
+window.switchBotsSubtab = switchBotsSubtab;
+
+// ============================================================================
+// USAGE TRACKING
+// ============================================================================
+
+let usageData = null;
+let currentUsagePeriod = 'day';
+
+/**
+ * Load usage data with live SSE updates
+ */
+function loadUsageLive() {
+  streams.connect('usage', (data) => {
+    usageData = data;
+    renderUsageData();
+  });
+}
+
+/**
+ * Set the usage period filter
+ */
+function setUsagePeriod(period) {
+  currentUsagePeriod = period;
+  
+  // Update period tab buttons
+  document.querySelectorAll('.usage-period-tab').forEach(tab => {
+    tab.classList.toggle('active', tab.dataset.period === period);
+  });
+  
+  // Reload data with new period (not using SSE for this, direct API call)
+  loadUsageForPeriod(period);
+}
+
+/**
+ * Load usage data for a specific period
+ */
+async function loadUsageForPeriod(period) {
+  try {
+    const summary = await api.usage.summary(period);
+    usageData = summary;
+    renderUsageData();
+  } catch (error) {
+    console.error('Error loading usage for period:', error);
+    showToast('Failed to load usage data', 'error');
+  }
+}
+
+/**
+ * Force sync usage data from trace files
+ */
+async function syncUsageData() {
+  const statusEl = document.getElementById('usageSyncStatus');
+  const textEl = document.getElementById('usageSyncText');
+  
+  statusEl.classList.add('syncing');
+  textEl.textContent = 'Syncing...';
+  
+  try {
+    showToast('Syncing usage data...', 'info');
+    const result = await api.usage.sync();
+    
+    statusEl.classList.remove('syncing');
+    statusEl.classList.add('synced');
+    
+    if (result.totalNewRecords > 0) {
+      showToast(`Synced ${result.totalNewRecords} new records`, 'success');
+    } else {
+      showToast('Already up to date', 'info');
+    }
+    
+    textEl.textContent = `Last sync: just now`;
+    
+    // Reload data
+    await loadUsageForPeriod(currentUsagePeriod);
+  } catch (error) {
+    statusEl.classList.remove('syncing');
+    textEl.textContent = `Sync failed: ${error.message}`;
+    showToast('Failed to sync usage data', 'error');
+  }
+}
+
+/**
+ * Force refresh usage (bypass stream, immediate fetch)
+ */
+async function forceRefreshUsage() {
+  showToast('Refreshing usage data...', 'info');
+  await loadUsageForPeriod(currentUsagePeriod);
+  showToast('Usage refreshed', 'success');
+}
+
+/**
+ * Render usage data to the UI
+ */
+function renderUsageData() {
+  if (!usageData) return;
+  
+  const { totals, bots } = usageData;
+  
+  // Update totals cards
+  pulseUpdate('usageTotalCost', formatCurrency(totals.total_cost_usd || 0));
+  pulseUpdate('usageTotalRequests', formatNumber(totals.total_requests || 0));
+  pulseUpdate('usageTotalTokens', formatNumber(totals.total_tokens || 0));
+  pulseUpdate('usageCacheHitRate', formatPercent(totals.cache_hit_ratio || 0));
+  
+  // Update cache stats
+  pulseUpdate('cacheTotalWrites', formatNumber(totals.total_cache_write_tokens || 0));
+  pulseUpdate('cacheTotalReads', formatNumber(totals.total_cache_read_tokens || 0));
+  pulseUpdate('cacheEstimatedSavings', formatCurrency(totals.cache_savings_estimate || 0));
+  
+  // Update sync status
+  if (usageData.lastSync) {
+    const statusEl = document.getElementById('usageSyncStatus');
+    const textEl = document.getElementById('usageSyncText');
+    statusEl.classList.add('synced');
+    textEl.textContent = `Last sync: ${formatRelativeTime(usageData.lastSync) || 'just now'}`;
+  }
+  
+  // Render per-bot breakdown
+  renderUsageBotsGrid(bots || []);
+}
+
+/**
+ * Render the per-bot usage breakdown
+ */
+function renderUsageBotsGrid(bots) {
+  const container = document.getElementById('usageBotsGrid');
+  
+  if (!bots || bots.length === 0) {
+    container.innerHTML = `
+      <div class="usage-empty">
+        <div class="usage-empty-icon">📊</div>
+        <p class="usage-empty-title">No usage data yet</p>
+        <p class="usage-empty-description">
+          Run some bots and click "Sync Now" to load trace data.
+        </p>
+      </div>
+    `;
+    return;
+  }
+  
+  container.innerHTML = bots.map(bot => {
+    const cacheHitPercent = (bot.cache_hit_ratio || 0) * 100;
+    const totalTokens = bot.total_tokens || 0;
+    
+    return `
+      <div class="usage-bot-card">
+        <div class="usage-bot-header">
+          <div>
+            <div class="usage-bot-name">
+              🤖 ${escapeHtml(bot.bot_name)}
+            </div>
+            ${bot.model ? `<div class="usage-bot-model">${escapeHtml(bot.model)}</div>` : ''}
+          </div>
+          <div class="usage-bot-cost">${formatCurrency(bot.total_cost_usd || 0)}</div>
+        </div>
+        
+        <div class="usage-bot-stats">
+          <div class="usage-bot-stat">
+            <span class="usage-bot-stat-label">Requests</span>
+            <span class="usage-bot-stat-value">${formatNumber(bot.request_count || 0)}</span>
+          </div>
+          <div class="usage-bot-stat">
+            <span class="usage-bot-stat-label">Input Tokens</span>
+            <span class="usage-bot-stat-value">${formatNumber(bot.total_input_tokens || 0)}</span>
+          </div>
+          <div class="usage-bot-stat">
+            <span class="usage-bot-stat-label">Output Tokens</span>
+            <span class="usage-bot-stat-value">${formatNumber(bot.total_output_tokens || 0)}</span>
+          </div>
+          <div class="usage-bot-stat">
+            <span class="usage-bot-stat-label">Avg Duration</span>
+            <span class="usage-bot-stat-value">${formatDuration(bot.avg_duration_ms || 0)}</span>
+          </div>
+          <div class="usage-bot-stat">
+            <span class="usage-bot-stat-label">Cache Writes</span>
+            <span class="usage-bot-stat-value highlight">${formatNumber(bot.total_cache_write_tokens || 0)}</span>
+          </div>
+          <div class="usage-bot-stat">
+            <span class="usage-bot-stat-label">Cache Reads</span>
+            <span class="usage-bot-stat-value success">${formatNumber(bot.total_cache_read_tokens || 0)}</span>
+          </div>
+        </div>
+        
+        ${totalTokens > 0 ? `
+          <div class="usage-cache-bar">
+            <div class="usage-cache-bar-label">
+              <span>Cache Hit Rate</span>
+              <span>${cacheHitPercent.toFixed(1)}%</span>
+            </div>
+            <div class="usage-cache-bar-track">
+              <div class="usage-cache-bar-fill" style="width: ${cacheHitPercent}%"></div>
+            </div>
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+// ============================================================================
+// USAGE FORMATTING HELPERS
+// ============================================================================
+
+function formatCurrency(value) {
+  if (value == null) return '$0.00';
+  return `$${value.toFixed(2)}`;
+}
+
+function formatNumber(value) {
+  if (value == null) return '0';
+  if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+  if (value >= 1000) return `${(value / 1000).toFixed(1)}K`;
+  return value.toLocaleString();
+}
+
+function formatPercent(ratio) {
+  if (ratio == null) return '0%';
+  return `${(ratio * 100).toFixed(1)}%`;
+}
+
+function formatDuration(ms) {
+  if (ms == null || ms === 0) return '—';
+  if (ms < 1000) return `${Math.round(ms)}ms`;
+  if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
+  return `${(ms / 60000).toFixed(1)}m`;
+}
+
+// Make usage functions global
+window.loadUsageLive = loadUsageLive;
+window.setUsagePeriod = setUsagePeriod;
+window.syncUsageData = syncUsageData;
+window.forceRefreshUsage = forceRefreshUsage;
+window.formatCurrency = formatCurrency;
+window.formatNumber = formatNumber;
+window.formatPercent = formatPercent;
+window.formatDuration = formatDuration;
 
 // ============================================================================
 // SERVICES MANAGEMENT

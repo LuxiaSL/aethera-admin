@@ -22,6 +22,7 @@ const DOMAIN_CONFIG = {
   dreams:    { interval: 5000, aggregator: 'getDreamsData' },
   server:    { interval: 3000, aggregator: 'getServerData' },
   blog:      { interval: 30000, aggregator: 'getBlogData' },
+  usage:     { interval: 10000, aggregator: 'getUsageData' },  // Sync + update every 10s
 };
 
 // Track active connections for debugging/monitoring

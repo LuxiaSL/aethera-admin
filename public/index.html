@@ -18,6 +18,7 @@
   <link rel="stylesheet" href="/css/pages/dreams.css">
   <link rel="stylesheet" href="/css/pages/blog.css">
   <link rel="stylesheet" href="/css/pages/server.css">
+  <link rel="stylesheet" href="/css/pages/usage.css">
 </head>
 <body>
   <!-- Login Screen -->
@@ -124,8 +125,8 @@
           <span class="stat-value" id="statDreams">-</span>
         </div>
         <div class="stat-card">
-          <span class="stat-label">Blog Posts</span>
-          <span class="stat-value" id="statBlogPosts">-</span>
+          <span class="stat-label">Today's Cost</span>
+          <span class="stat-value" id="statTodayCost">-</span>
         </div>
       </div>
       
@@ -158,28 +159,133 @@
     <div id="page-bots" class="page-content">
       <div class="page-header">
         <h1 class="page-title">ChapterX Bots</h1>
-        <p class="page-subtitle">Manage Discord bots via systemd services</p>
+        <p class="page-subtitle">Manage Discord bots and monitor usage</p>
       </div>
       
-      <!-- Deployment Slots Info -->
-      <div id="slotsInfo" class="slots-info">
-        <!-- Populated by JS -->
-      </div>
-      
-      <!-- Toolbar -->
-      <div class="bots-toolbar">
-        <div class="bots-stats">
-          <span class="bots-stat">Total: <span id="botsTotal" class="value">0</span></span>
-          <span class="bots-stat">Running: <span id="botsRunning" class="value success">0</span></span>
-        </div>
-        <button class="btn-secondary" onclick="forceRefreshBots()">
-          ⟳ Force Refresh
+      <!-- Sub-tabs for Bots section -->
+      <div class="bots-sub-tabs">
+        <button class="bots-sub-tab active" data-subtab="management" onclick="switchBotsSubtab('management')">
+          🤖 Management
+        </button>
+        <button class="bots-sub-tab" data-subtab="usage" onclick="switchBotsSubtab('usage')">
+          📊 Usage & Costs
         </button>
       </div>
       
-      <!-- Bots Grid -->
-      <div id="botsGrid" class="bots-grid">
-        <!-- Bot cards populated by JS -->
+      <!-- Management Sub-tab -->
+      <div id="bots-subtab-management" class="bots-subtab-content active">
+        <!-- Deployment Slots Info -->
+        <div id="slotsInfo" class="slots-info">
+          <!-- Populated by JS -->
+        </div>
+        
+        <!-- Toolbar -->
+        <div class="bots-toolbar">
+          <div class="bots-stats">
+            <span class="bots-stat">Total: <span id="botsTotal" class="value">0</span></span>
+            <span class="bots-stat">Running: <span id="botsRunning" class="value success">0</span></span>
+          </div>
+          <button class="btn-secondary" onclick="forceRefreshBots()">
+            ⟳ Force Refresh
+          </button>
+        </div>
+        
+        <!-- Bots Grid -->
+        <div id="botsGrid" class="bots-grid">
+          <!-- Bot cards populated by JS -->
+        </div>
+      </div>
+      
+      <!-- Usage Sub-tab -->
+      <div id="bots-subtab-usage" class="bots-subtab-content">
+        <!-- Usage Period Selector -->
+        <div class="usage-toolbar">
+          <div class="usage-period-tabs">
+            <button class="usage-period-tab active" data-period="day" onclick="setUsagePeriod('day')">24 Hours</button>
+            <button class="usage-period-tab" data-period="week" onclick="setUsagePeriod('week')">7 Days</button>
+            <button class="usage-period-tab" data-period="month" onclick="setUsagePeriod('month')">30 Days</button>
+            <button class="usage-period-tab" data-period="all" onclick="setUsagePeriod('all')">All Time</button>
+          </div>
+          <div class="usage-actions">
+            <button class="btn-secondary" onclick="syncUsageData()">
+              🔄 Sync Now
+            </button>
+            <button class="btn-ghost" onclick="forceRefreshUsage()">
+              ⟳ Refresh
+            </button>
+          </div>
+        </div>
+        
+        <!-- Usage Totals Cards -->
+        <div class="usage-totals-grid">
+          <div class="usage-total-card">
+            <div class="usage-total-icon">💰</div>
+            <div class="usage-total-content">
+              <span class="usage-total-label">Estimated Cost</span>
+              <span class="usage-total-value" id="usageTotalCost">$0.00</span>
+            </div>
+          </div>
+          <div class="usage-total-card">
+            <div class="usage-total-icon">📝</div>
+            <div class="usage-total-content">
+              <span class="usage-total-label">Total Requests</span>
+              <span class="usage-total-value" id="usageTotalRequests">0</span>
+            </div>
+          </div>
+          <div class="usage-total-card">
+            <div class="usage-total-icon">⚡</div>
+            <div class="usage-total-content">
+              <span class="usage-total-label">Total Tokens</span>
+              <span class="usage-total-value" id="usageTotalTokens">0</span>
+            </div>
+          </div>
+          <div class="usage-total-card">
+            <div class="usage-total-icon">💾</div>
+            <div class="usage-total-content">
+              <span class="usage-total-label">Cache Hit Rate</span>
+              <span class="usage-total-value" id="usageCacheHitRate">0%</span>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Sync Status -->
+        <div id="usageSyncStatus" class="usage-sync-status">
+          <span class="sync-dot"></span>
+          <span id="usageSyncText">Last sync: Never</span>
+        </div>
+        
+        <!-- Per-Bot Breakdown -->
+        <div class="usage-section">
+          <h3 class="usage-section-title">📈 Per-Bot Breakdown</h3>
+          <div id="usageBotsGrid" class="usage-bots-grid">
+            <div class="usage-loading">
+              <div class="spinner"></div>
+              <span>Loading usage data...</span>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Cache Performance -->
+        <div class="usage-section">
+          <h3 class="usage-section-title">💾 Cache Performance</h3>
+          <div id="usageCacheStats" class="usage-cache-stats">
+            <div class="cache-stat-card">
+              <div class="cache-stat-label">Cache Writes</div>
+              <div class="cache-stat-value" id="cacheTotalWrites">0</div>
+              <div class="cache-stat-sublabel">tokens written</div>
+            </div>
+            <div class="cache-stat-card">
+              <div class="cache-stat-label">Cache Reads</div>
+              <div class="cache-stat-value" id="cacheTotalReads">0</div>
+              <div class="cache-stat-sublabel">tokens read</div>
+            </div>
+            <div class="cache-stat-card highlight">
+              <div class="cache-stat-label">Estimated Savings</div>
+              <div class="cache-stat-value" id="cacheEstimatedSavings">$0.00</div>
+              <div class="cache-stat-sublabel">from cache hits</div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
     

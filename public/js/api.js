@@ -451,6 +451,48 @@ const api = {
   },
   
   // ============================================================================
+  // USAGE TRACKING
+  // ============================================================================
+  
+  usage: {
+    /**
+     * Sync usage data from trace files
+     * @param {boolean} fullRescan - Whether to do a full rescan (vs incremental)
+     */
+    async sync(fullRescan = false) {
+      return api.request('/usage/sync', {
+        method: 'POST',
+        body: { fullRescan },
+      });
+    },
+    
+    /**
+     * Get usage summary for all bots
+     * @param {string} period - 'day', 'week', 'month', or 'all'
+     */
+    async summary(period = 'day') {
+      return api.request(`/usage/summary?period=${period}`);
+    },
+    
+    /**
+     * Get detailed usage for a specific bot
+     * @param {string} botName - Bot name
+     * @param {string} period - 'day', 'week', 'month', or 'all'
+     */
+    async bot(botName, period = 'day') {
+      return api.request(`/usage/bot/${encodeURIComponent(botName)}?period=${period}`);
+    },
+    
+    /**
+     * Get recent usage records
+     * @param {number} limit - Number of records to return
+     */
+    async recent(limit = 50) {
+      return api.request(`/usage/recent?limit=${limit}`);
+    },
+  },
+  
+  // ============================================================================
   // SERVER MONITORING
   // ============================================================================
   
