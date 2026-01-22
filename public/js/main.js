@@ -963,7 +963,17 @@ async function forceRefreshUsage() {
 function renderUsageData() {
   if (!usageData) return;
   
-  const { totals, bots } = usageData;
+  // Support both SSE format (totalsByPeriod) and API format (totals)
+  let totals, bots;
+  if (usageData.totalsByPeriod) {
+    // SSE stream format - pick current period
+    totals = usageData.totalsByPeriod[currentUsagePeriod] || usageData.totalsByPeriod.day || {};
+    bots = usageData.botsByPeriod?.[currentUsagePeriod] || usageData.botsByPeriod?.day || [];
+  } else {
+    // Direct API format
+    totals = usageData.totals || {};
+    bots = usageData.bots || [];
+  }
   
   // Update totals cards
   pulseUpdate('usageTotalCost', formatCurrency(totals.total_cost_usd || 0));
