@@ -74,6 +74,41 @@ router.post('/backfill/:slot', async (req, res) => {
   }
 });
 
+/**
+ * POST /api/usage/backfill-all
+ * Full backfill from all slots (reprocess everything with fresh cost calculations)
+ */
+router.post('/backfill-all', async (req, res) => {
+  try {
+    // Clear all existing records to recalculate costs
+    usage.clearAllRecords();
+    
+    // Sync from all slots
+    const results = usage.syncAll();
+    
+    // Calculate totals
+    let totalNew = 0;
+    let totalFailed = 0;
+    for (const [slot, result] of Object.entries(results)) {
+      if (result.success) {
+        totalNew += result.newRecords || 0;
+        totalFailed += result.failed || 0;
+      }
+    }
+    
+    res.json({
+      success: true,
+      message: 'Full backfill complete with recalculated costs',
+      slots: results,
+      totalNewRecords: totalNew,
+      totalFailed,
+    });
+  } catch (error) {
+    console.error('Error during full backfill:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ============================================================================
 // QUERY OPERATIONS
 // ============================================================================
@@ -165,7 +200,7 @@ router.get('/bot/:botName', async (req, res) => {
  */
 router.get('/totals', async (req, res) => {
   try {
-    const periods = ['day', 'week', 'month', 'all'];
+    const periods = ['hour', 'day', 'week', 'month', 'all'];
     const results = {};
     
     for (const period of periods) {
