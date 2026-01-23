@@ -327,6 +327,79 @@ const api = {
     async jobStatus(jobId) {
       return api.request(`/dreams/jobs/${jobId}`);
     },
+    
+    // === Two-Pod Architecture ===
+    
+    /**
+     * Get comprehensive two-pod status (ComfyUI + DreamGen + Aethera)
+     */
+    async podsStatus() {
+      return api.request('/dreams/pods/status');
+    },
+    
+    /**
+     * Start both pods in sequence
+     */
+    async podsStart() {
+      return api.request('/dreams/pods/start', { method: 'POST' });
+    },
+    
+    /**
+     * Stop both pods
+     */
+    async podsStop() {
+      return api.request('/dreams/pods/stop', { method: 'POST' });
+    },
+    
+    /**
+     * Update both pods (pull latest Docker images)
+     */
+    async podsUpdate() {
+      return api.request('/dreams/pods/update', { method: 'POST' });
+    },
+    
+    /**
+     * Update ComfyUI pod only
+     * @param {boolean} stopFirst - Stop pod before updating
+     */
+    async updateComfyUI(stopFirst = false) {
+      return api.request('/dreams/pods/comfyui/update', { 
+        method: 'POST',
+        body: { stopFirst },
+      });
+    },
+    
+    /**
+     * Update DreamGen pod only
+     * @param {boolean} stopFirst - Stop pod before updating
+     */
+    async updateDreamGen(stopFirst = false) {
+      return api.request('/dreams/pods/dreamgen/update', { 
+        method: 'POST',
+        body: { stopFirst },
+      });
+    },
+    
+    /**
+     * Get ComfyUI registry status
+     */
+    async registry() {
+      return api.request('/dreams/registry');
+    },
+    
+    /**
+     * Get saved generation state info
+     */
+    async stateInfo() {
+      return api.request('/dreams/state');
+    },
+    
+    /**
+     * Clear saved generation state
+     */
+    async clearState() {
+      return api.request('/dreams/state', { method: 'DELETE' });
+    },
   },
   
   // ============================================================================

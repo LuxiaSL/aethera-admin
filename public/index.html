@@ -610,6 +610,114 @@
           </div>
         </div>
       </div>
+      
+      <!-- Two-Pod Architecture Section -->
+      <div class="gpu-card" style="margin-top: var(--space-lg);">
+        <div class="gpu-card-header">
+          <div class="gpu-card-title">
+            <span class="emoji">🐳</span>
+            <div>
+              <h3>Two-Pod Architecture</h3>
+              <div class="gpu-card-subtitle">ComfyUI + DreamGen pods • Persistent deployment</div>
+            </div>
+          </div>
+          <div id="podsStateBadge" class="gpu-state-badge idle">
+            <span class="status-dot"></span>
+            <span id="podsStateText">Loading...</span>
+          </div>
+        </div>
+        
+        <div class="gpu-card-body">
+          <!-- Pod Status Grid -->
+          <div class="runpod-info" style="margin-bottom: var(--space-md);">
+            <div class="runpod-info-title">
+              <span>📦</span>
+              <span>Pod Status</span>
+            </div>
+            <div class="runpod-info-grid">
+              <div class="runpod-stat">
+                <span class="runpod-stat-label">ComfyUI</span>
+                <span class="runpod-stat-value" id="comfyuiPodStatus">—</span>
+              </div>
+              <div class="runpod-stat">
+                <span class="runpod-stat-label">DreamGen</span>
+                <span class="runpod-stat-value" id="dreamgenPodStatus">—</span>
+              </div>
+              <div class="runpod-stat">
+                <span class="runpod-stat-label">Registry</span>
+                <span class="runpod-stat-value" id="comfyuiRegistry">—</span>
+              </div>
+              <div class="runpod-stat">
+                <span class="runpod-stat-label">Saved State</span>
+                <span class="runpod-stat-value" id="savedStateInfo">—</span>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Cost Display (Two-Pod) -->
+          <div class="gpu-cost-display" style="margin-bottom: var(--space-md);">
+            <div class="gpu-cost-info">
+              <span class="gpu-cost-label">Session Cost (Est.)</span>
+              <span class="gpu-cost-value" id="podsTotalCost">$0.00</span>
+            </div>
+            <div class="gpu-cost-rate">
+              <div>ComfyUI: <span id="comfyuiUptime">0s</span> @ $<span id="comfyuiRate">0.20</span>/hr</div>
+              <div>DreamGen: <span id="dreamgenUptime">0s</span> @ $<span id="dreamgenRate">0.10</span>/hr</div>
+            </div>
+          </div>
+          
+          <!-- Pod Control Actions -->
+          <div class="gpu-actions" style="margin-bottom: var(--space-md);">
+            <button id="podsStartBtn" class="btn btn-start" onclick="startPods()">
+              ▶️ Start Pods
+            </button>
+            <button id="podsStopBtn" class="btn btn-stop" onclick="stopPods()">
+              ⏹️ Stop Pods
+            </button>
+            <button class="btn btn-secondary" onclick="refreshPodsStatus()">
+              ⟳ Refresh
+            </button>
+          </div>
+          
+          <!-- Update Section -->
+          <div class="runpod-info">
+            <div class="runpod-info-title">
+              <span>🔄</span>
+              <span>Docker Image Updates</span>
+            </div>
+            <p style="font-size: var(--text-sm); color: var(--text-secondary); margin-bottom: var(--space-sm);">
+              Pull latest Docker images from registry. Pods will restart with fresh images.
+            </p>
+            <div class="gpu-actions">
+              <button class="btn btn-secondary" onclick="updateAllPods()">
+                🔄 Update Both Pods
+              </button>
+              <button class="btn btn-ghost" onclick="updateComfyUIPod()">
+                Update ComfyUI
+              </button>
+              <button class="btn btn-ghost" onclick="updateDreamGenPod()">
+                Update DreamGen
+              </button>
+            </div>
+          </div>
+          
+          <!-- State Management -->
+          <div class="runpod-info" style="margin-top: var(--space-md);">
+            <div class="runpod-info-title">
+              <span>💾</span>
+              <span>State Management</span>
+            </div>
+            <p style="font-size: var(--text-sm); color: var(--text-secondary); margin-bottom: var(--space-sm);">
+              Generation state is saved on VPS for seamless resume after pod restarts.
+            </p>
+            <div class="gpu-actions">
+              <button class="btn btn-ghost" onclick="clearSavedState()">
+                🗑️ Clear Saved State
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
     
     <!-- Blog Page -->

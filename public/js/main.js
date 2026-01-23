@@ -1873,8 +1873,10 @@ window.updateSlotDeps = updateSlotDeps;
 let dreamsStatus = null;
 
 async function loadDreams() {
-  // Use live data stream instead of polling
+  // Use live data stream for legacy serverless status
   loadDreamsLive();
+  // Also load two-pod status
+  refreshPodsStatus();
 }
 
 /**
@@ -2119,6 +2121,262 @@ function openRunpodDashboard(event) {
   window.open('https://www.runpod.io/console/serverless', '_blank');
 }
 
+// ============================================================================
+// TWO-POD ARCHITECTURE MANAGEMENT
+// ============================================================================
+
+let podsStatus = null;
+
+/**
+ * Fetch and render two-pod status
+ */
+async function refreshPodsStatus() {
+  try {
+    podsStatus = await api.dreams.podsStatus();
+    renderPodsStatus();
+  } catch (error) {
+    console.error('Failed to fetch pods status:', error);
+  }
+}
+
+/**
+ * Render two-pod status to the UI
+ */
+function renderPodsStatus() {
+  if (!podsStatus) return;
+  
+  // State badge
+  const stateBadge = document.getElementById('podsStateBadge');
+  const stateText = document.getElementById('podsStateText');
+  if (stateBadge && stateText) {
+    const state = podsStatus.state || 'unknown';
+    stateBadge.className = `gpu-state-badge ${state}`;
+    stateText.textContent = podsStatus.stateMessage || state;
+  }
+  
+  // Pod statuses
+  const comfyuiStatus = document.getElementById('comfyuiPodStatus');
+  const dreamgenStatus = document.getElementById('dreamgenPodStatus');
+  if (comfyuiStatus) {
+    const pod = podsStatus.pods?.comfyui;
+    comfyuiStatus.textContent = pod?.status || 'Not configured';
+    comfyuiStatus.className = `runpod-stat-value ${pod?.status === 'RUNNING' ? 'success' : ''}`;
+  }
+  if (dreamgenStatus) {
+    const pod = podsStatus.pods?.dreamgen;
+    dreamgenStatus.textContent = pod?.status || 'Not configured';
+    dreamgenStatus.className = `runpod-stat-value ${pod?.status === 'RUNNING' ? 'success' : ''}`;
+  }
+  
+  // Registry status
+  const registryEl = document.getElementById('comfyuiRegistry');
+  if (registryEl) {
+    const reg = podsStatus.registry;
+    if (reg?.registered) {
+      registryEl.textContent = '✓ Registered';
+      registryEl.className = 'runpod-stat-value success';
+    } else {
+      registryEl.textContent = 'Not registered';
+      registryEl.className = 'runpod-stat-value';
+    }
+  }
+  
+  // Saved state
+  const stateEl = document.getElementById('savedStateInfo');
+  if (stateEl) {
+    const state = podsStatus.state;
+    if (state?.has_state) {
+      const age = state.age_seconds ? Math.round(state.age_seconds / 60) : 0;
+      stateEl.textContent = `${age}m ago`;
+    } else {
+      stateEl.textContent = 'None';
+    }
+  }
+  
+  // Cost display
+  const totalCost = document.getElementById('podsTotalCost');
+  const comfyuiUptime = document.getElementById('comfyuiUptime');
+  const dreamgenUptime = document.getElementById('dreamgenUptime');
+  const comfyuiRate = document.getElementById('comfyuiRate');
+  const dreamgenRate = document.getElementById('dreamgenRate');
+  
+  if (podsStatus.cost) {
+    if (totalCost) totalCost.textContent = `$${podsStatus.cost.total?.toFixed(2) || '0.00'}`;
+    if (comfyuiUptime) comfyuiUptime.textContent = podsStatus.pods?.comfyui?.uptimeFormatted || '0s';
+    if (dreamgenUptime) dreamgenUptime.textContent = podsStatus.pods?.dreamgen?.uptimeFormatted || '0s';
+    if (comfyuiRate) comfyuiRate.textContent = podsStatus.cost.comfyui?.hourlyRate?.toFixed(2) || '0.20';
+    if (dreamgenRate) dreamgenRate.textContent = podsStatus.cost.dreamgen?.hourlyRate?.toFixed(2) || '0.10';
+  }
+  
+  // Update action buttons
+  updatePodsActionButtons();
+}
+
+/**
+ * Update pod action button states
+ */
+function updatePodsActionButtons() {
+  const startBtn = document.getElementById('podsStartBtn');
+  const stopBtn = document.getElementById('podsStopBtn');
+  
+  if (!podsStatus?.configured) {
+    if (startBtn) startBtn.disabled = true;
+    if (stopBtn) stopBtn.disabled = true;
+    return;
+  }
+  
+  const state = podsStatus.state;
+  
+  // Start: enabled when idle or partial
+  if (startBtn) startBtn.disabled = state === 'running' || state === 'starting';
+  
+  // Stop: enabled when running, starting, or partial
+  if (stopBtn) stopBtn.disabled = state === 'idle' || state === 'not_configured';
+}
+
+/**
+ * Start both pods
+ */
+async function startPods() {
+  if (!podsStatus?.configured) {
+    showToast('Pod IDs not configured', 'error');
+    return;
+  }
+  
+  try {
+    showToast('Starting pods... This may take a few minutes.', 'info');
+    const result = await api.dreams.podsStart();
+    
+    if (result.success) {
+      if (result.alreadyRunning) {
+        showToast('Pods are already running', 'info');
+      } else {
+        showToast('Pods starting...', 'success');
+        if (result.warnings?.length) {
+          result.warnings.forEach(w => showToast(w, 'warning'));
+        }
+      }
+      await refreshPodsStatus();
+    }
+  } catch (error) {
+    showToast(error.message || 'Failed to start pods', 'error');
+  }
+}
+
+/**
+ * Stop both pods
+ */
+async function stopPods() {
+  if (!confirm('Stop both pods? This will halt dream generation.')) {
+    return;
+  }
+  
+  try {
+    showToast('Stopping pods...', 'info');
+    const result = await api.dreams.podsStop();
+    
+    if (result.success) {
+      showToast('Pods stopped', 'success');
+      if (result.warnings?.length) {
+        result.warnings.forEach(w => showToast(w, 'warning'));
+      }
+      await refreshPodsStatus();
+    }
+  } catch (error) {
+    showToast(error.message || 'Failed to stop pods', 'error');
+  }
+}
+
+/**
+ * Update both pods (pull latest Docker images)
+ */
+async function updateAllPods() {
+  if (!confirm('Update both pods? This will stop them, pull latest images, and require a restart.')) {
+    return;
+  }
+  
+  try {
+    showToast('Updating pods... This may take a few minutes.', 'info');
+    const result = await api.dreams.podsUpdate();
+    
+    if (result.success) {
+      const updated = result.updates?.filter(u => u.success)?.length || 0;
+      showToast(`Updated ${updated} pod(s). Start them to use new images.`, 'success');
+      if (result.warnings?.length) {
+        result.warnings.forEach(w => showToast(w, 'warning'));
+      }
+      await refreshPodsStatus();
+    }
+  } catch (error) {
+    showToast(error.message || 'Failed to update pods', 'error');
+  }
+}
+
+/**
+ * Update ComfyUI pod only
+ */
+async function updateComfyUIPod() {
+  if (!confirm('Update ComfyUI pod? This will trigger a reset and pull the latest image.')) {
+    return;
+  }
+  
+  try {
+    showToast('Updating ComfyUI pod...', 'info');
+    const result = await api.dreams.updateComfyUI(true); // stopFirst = true
+    
+    if (result.success) {
+      showToast('ComfyUI pod updated. Restart to use new image.', 'success');
+      await refreshPodsStatus();
+    }
+  } catch (error) {
+    showToast(error.message || 'Failed to update ComfyUI pod', 'error');
+  }
+}
+
+/**
+ * Update DreamGen pod only
+ */
+async function updateDreamGenPod() {
+  if (!confirm('Update DreamGen pod? This will trigger a reset and pull the latest image.')) {
+    return;
+  }
+  
+  try {
+    showToast('Updating DreamGen pod...', 'info');
+    const result = await api.dreams.updateDreamGen(true); // stopFirst = true
+    
+    if (result.success) {
+      showToast('DreamGen pod updated. Restart to use new image.', 'success');
+      await refreshPodsStatus();
+    }
+  } catch (error) {
+    showToast(error.message || 'Failed to update DreamGen pod', 'error');
+  }
+}
+
+/**
+ * Clear saved generation state
+ */
+async function clearSavedState() {
+  if (!confirm('Clear saved state? The next generation will start fresh.')) {
+    return;
+  }
+  
+  try {
+    showToast('Clearing saved state...', 'info');
+    const result = await api.dreams.clearState();
+    
+    if (result.success) {
+      showToast('Saved state cleared', 'success');
+      await refreshPodsStatus();
+    } else {
+      showToast(result.error || 'Failed to clear state', 'error');
+    }
+  } catch (error) {
+    showToast(error.message || 'Failed to clear state', 'error');
+  }
+}
+
 // Make dreams functions global
 window.loadDreams = loadDreams;
 window.refreshDreamsStatus = refreshDreamsStatus;
@@ -2128,6 +2386,15 @@ window.stopGpu = stopGpu;
 window.restartGpu = restartGpu;
 window.openDreamsViewer = openDreamsViewer;
 window.openRunpodDashboard = openRunpodDashboard;
+
+// Make two-pod functions global
+window.refreshPodsStatus = refreshPodsStatus;
+window.startPods = startPods;
+window.stopPods = stopPods;
+window.updateAllPods = updateAllPods;
+window.updateComfyUIPod = updateComfyUIPod;
+window.updateDreamGenPod = updateDreamGenPod;
+window.clearSavedState = clearSavedState;
 
 // ============================================================================
 // BLOG MANAGEMENT
