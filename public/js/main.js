@@ -1873,9 +1873,7 @@ window.updateSlotDeps = updateSlotDeps;
 let dreamsStatus = null;
 
 async function loadDreams() {
-  // Use live data stream for legacy serverless status
-  loadDreamsLive();
-  // Also load two-pod status
+  // Load two-pod status (primary)
   refreshPodsStatus();
 }
 
@@ -2145,12 +2143,25 @@ async function refreshPodsStatus() {
 function renderPodsStatus() {
   if (!podsStatus) return;
   
+  // Config warning
+  const configWarning = document.getElementById('dreamsConfigWarning');
+  if (configWarning) {
+    configWarning.style.display = podsStatus.configured ? 'none' : 'flex';
+  }
+  
   // State badge
   const stateBadge = document.getElementById('podsStateBadge');
   const stateText = document.getElementById('podsStateText');
   if (stateBadge && stateText) {
     const state = podsStatus.state || 'unknown';
-    stateBadge.className = `gpu-state-badge ${state}`;
+    const stateMap = {
+      'running': 'running',
+      'starting': 'starting',
+      'idle': 'idle',
+      'partial': 'starting',
+      'not_configured': 'idle',
+    };
+    stateBadge.className = `gpu-state-badge ${stateMap[state] || 'unknown'}`;
     stateText.textContent = podsStatus.stateMessage || state;
   }
   
@@ -2181,12 +2192,12 @@ function renderPodsStatus() {
     }
   }
   
-  // Saved state
+  // Saved state (note: podsStatus.state is overloaded - check for object)
   const stateEl = document.getElementById('savedStateInfo');
   if (stateEl) {
-    const state = podsStatus.state;
-    if (state?.has_state) {
-      const age = state.age_seconds ? Math.round(state.age_seconds / 60) : 0;
+    const savedState = podsStatus.state && typeof podsStatus.state === 'object' ? podsStatus.state : null;
+    if (savedState?.has_state) {
+      const age = savedState.age_seconds ? Math.round(savedState.age_seconds / 60) : 0;
       stateEl.textContent = `${age}m ago`;
     } else {
       stateEl.textContent = 'None';
@@ -2206,6 +2217,29 @@ function renderPodsStatus() {
     if (dreamgenUptime) dreamgenUptime.textContent = podsStatus.pods?.dreamgen?.uptimeFormatted || '0s';
     if (comfyuiRate) comfyuiRate.textContent = podsStatus.cost.comfyui?.hourlyRate?.toFixed(2) || '0.20';
     if (dreamgenRate) dreamgenRate.textContent = podsStatus.cost.dreamgen?.hourlyRate?.toFixed(2) || '0.10';
+  }
+  
+  // Aethera (VPS) status
+  const aethera = podsStatus.aethera || {};
+  const aetheraConnection = document.getElementById('aetheraConnection');
+  const aetheraGpuActive = document.getElementById('aetheraGpuActive');
+  const aetheraWsViewers = document.getElementById('aetheraWsViewers');
+  const aetheraFrameCount = document.getElementById('aetheraFrameCount');
+  
+  if (aetheraConnection) {
+    aetheraConnection.textContent = aethera.error ? 'Offline' : 'Online';
+    aetheraConnection.className = `gpu-stat-value ${aethera.error ? '' : 'success'}`;
+  }
+  if (aetheraGpuActive) {
+    const gpuActive = aethera.gpu?.active;
+    aetheraGpuActive.textContent = gpuActive ? 'Yes' : 'No';
+    aetheraGpuActive.className = `gpu-stat-value ${gpuActive ? 'success' : ''}`;
+  }
+  if (aetheraWsViewers) {
+    aetheraWsViewers.textContent = aethera.viewers?.ws || 0;
+  }
+  if (aetheraFrameCount) {
+    aetheraFrameCount.textContent = aethera.generation?.frames_generated || 0;
   }
   
   // Update action buttons

@@ -460,7 +460,7 @@
     <div id="page-dreams" class="page-content">
       <div class="page-header">
         <h1 class="page-title">Dreams</h1>
-        <p class="page-subtitle">Control RunPod GPU and view Dream Window status</p>
+        <p class="page-subtitle">Control RunPod GPU pods and view Dream Window status</p>
       </div>
       
       <!-- Config Warning (if not configured) -->
@@ -469,156 +469,19 @@
         <div class="config-warning-content">
           <div class="config-warning-title">RunPod Not Configured</div>
           <div class="config-warning-text">
-            Set <code>RUNPOD_API_KEY</code> and <code>RUNPOD_ENDPOINT_ID</code> in your .env file to enable GPU control.
+            Set <code>RUNPOD_API_KEY</code>, <code>RUNPOD_COMFYUI_POD_ID</code>, and <code>RUNPOD_DREAMGEN_POD_ID</code> in your .env file to enable GPU control.
           </div>
         </div>
       </div>
       
-      <!-- GPU Control Card -->
+      <!-- Two-Pod Architecture Card (Primary) -->
       <div class="gpu-card">
         <div class="gpu-card-header">
           <div class="gpu-card-title">
             <span class="emoji">🎨</span>
             <div>
-              <h3>Dream Window GPU</h3>
-              <div class="gpu-card-subtitle">RunPod Serverless • GPU-accelerated AI art generation</div>
-            </div>
-          </div>
-          <div id="gpuStateBadge" class="gpu-state-badge idle">
-            <span class="status-dot"></span>
-            <span id="gpuStateText">Idle</span>
-          </div>
-        </div>
-        
-        <div class="gpu-card-body">
-          <!-- Status Message -->
-          <div id="gpuStatusMessage" class="gpu-status-message" style="display: none;">
-            <span id="gpuStatusIcon">⏳</span>
-            <span id="gpuStatusText">Loading...</span>
-          </div>
-          
-          <!-- Cost Display -->
-          <div class="gpu-cost-display">
-            <div class="gpu-cost-info">
-              <span class="gpu-cost-label">Session Cost (Est.)</span>
-              <span class="gpu-cost-value" id="gpuCost">$0.00</span>
-            </div>
-            <div class="gpu-cost-rate">
-              <div>Rate: $<span id="gpuRate">0.19</span>/hr</div>
-              <div>Uptime: <span id="gpuUptime">0s</span></div>
-            </div>
-          </div>
-          
-          <!-- GPU Stats Grid -->
-          <div class="gpu-stats">
-            <div class="gpu-stat">
-              <span class="gpu-stat-label">State</span>
-              <span class="gpu-stat-value" id="gpuStateValue">—</span>
-            </div>
-            <div class="gpu-stat">
-              <span class="gpu-stat-label">Viewers</span>
-              <span class="gpu-stat-value" id="gpuViewers">—</span>
-            </div>
-            <div class="gpu-stat">
-              <span class="gpu-stat-label">Frames</span>
-              <span class="gpu-stat-value" id="gpuFrames">—</span>
-            </div>
-            <div class="gpu-stat">
-              <span class="gpu-stat-label">FPS</span>
-              <span class="gpu-stat-value" id="gpuFps">—</span>
-            </div>
-          </div>
-          
-          <!-- Aethera Info Panel -->
-          <div class="aethera-info">
-            <div class="aethera-info-title">
-              <span>🌐</span>
-              <span>æthera (VPS) Status</span>
-            </div>
-            <div id="aetheraInfoGrid" class="aethera-info-grid">
-              <div class="gpu-stat">
-                <span class="gpu-stat-label">Connection</span>
-                <span class="gpu-stat-value" id="aetheraConnection">—</span>
-              </div>
-              <div class="gpu-stat">
-                <span class="gpu-stat-label">GPU Active</span>
-                <span class="gpu-stat-value" id="aetheraGpuActive">—</span>
-              </div>
-              <div class="gpu-stat">
-                <span class="gpu-stat-label">WS Viewers</span>
-                <span class="gpu-stat-value" id="aetheraWsViewers">—</span>
-              </div>
-              <div class="gpu-stat">
-                <span class="gpu-stat-label">API Active</span>
-                <span class="gpu-stat-value" id="aetheraApiActive">—</span>
-              </div>
-            </div>
-          </div>
-          
-          <!-- RunPod Info Panel -->
-          <div class="runpod-info">
-            <div class="runpod-info-title">
-              <span>☁️</span>
-              <span>RunPod Endpoint Status</span>
-            </div>
-            <div id="runpodInfoGrid" class="runpod-info-grid">
-              <div class="runpod-stat">
-                <span class="runpod-stat-label">Workers</span>
-                <span class="runpod-stat-value" id="runpodWorkers">—</span>
-              </div>
-              <div class="runpod-stat">
-                <span class="runpod-stat-label">Running</span>
-                <span class="runpod-stat-value" id="runpodRunning">—</span>
-              </div>
-              <div class="runpod-stat">
-                <span class="runpod-stat-label">In Queue</span>
-                <span class="runpod-stat-value" id="runpodQueued">—</span>
-              </div>
-              <div class="runpod-stat">
-                <span class="runpod-stat-label">Completed</span>
-                <span class="runpod-stat-value" id="runpodCompleted">—</span>
-              </div>
-            </div>
-          </div>
-          
-          <!-- GPU Actions -->
-          <div class="gpu-actions">
-            <button id="gpuStartBtn" class="btn btn-start" onclick="startGpu()">
-              ▶️ Start GPU
-            </button>
-            <button id="gpuStopBtn" class="btn btn-stop" onclick="stopGpu()">
-              ⏹️ Stop GPU
-            </button>
-            <button id="gpuRestartBtn" class="btn btn-restart" onclick="restartGpu()">
-              🔄 Restart
-            </button>
-            <button class="btn btn-secondary" onclick="forceRefreshDreams()">
-              ⟳ Force Refresh
-            </button>
-          </div>
-          
-          <!-- Quick Links -->
-          <div class="dreams-quick-links">
-            <a href="#" class="quick-link" onclick="openDreamsViewer(event)">
-              <span class="quick-link-icon">🖼️</span>
-              <span>Open Dreams Viewer</span>
-            </a>
-            <a href="#" class="quick-link" onclick="openRunpodDashboard(event)">
-              <span class="quick-link-icon">☁️</span>
-              <span>RunPod Dashboard</span>
-            </a>
-          </div>
-        </div>
-      </div>
-      
-      <!-- Two-Pod Architecture Section -->
-      <div class="gpu-card" style="margin-top: var(--space-lg);">
-        <div class="gpu-card-header">
-          <div class="gpu-card-title">
-            <span class="emoji">🐳</span>
-            <div>
-              <h3>Two-Pod Architecture</h3>
-              <div class="gpu-card-subtitle">ComfyUI + DreamGen pods • Persistent deployment</div>
+              <h3>Dream Window</h3>
+              <div class="gpu-card-subtitle">ComfyUI + DreamGen pods • GPU-accelerated AI art generation</div>
             </div>
           </div>
           <div id="podsStateBadge" class="gpu-state-badge idle">
@@ -654,7 +517,7 @@
             </div>
           </div>
           
-          <!-- Cost Display (Two-Pod) -->
+          <!-- Cost Display -->
           <div class="gpu-cost-display" style="margin-bottom: var(--space-md);">
             <div class="gpu-cost-info">
               <span class="gpu-cost-label">Session Cost (Est.)</span>
@@ -715,6 +578,44 @@
                 🗑️ Clear Saved State
               </button>
             </div>
+          </div>
+          
+          <!-- Aethera Info Panel -->
+          <div class="aethera-info" style="margin-top: var(--space-md);">
+            <div class="aethera-info-title">
+              <span>🌐</span>
+              <span>æthera (VPS) Status</span>
+            </div>
+            <div id="aetheraInfoGrid" class="aethera-info-grid">
+              <div class="gpu-stat">
+                <span class="gpu-stat-label">Connection</span>
+                <span class="gpu-stat-value" id="aetheraConnection">—</span>
+              </div>
+              <div class="gpu-stat">
+                <span class="gpu-stat-label">GPU Active</span>
+                <span class="gpu-stat-value" id="aetheraGpuActive">—</span>
+              </div>
+              <div class="gpu-stat">
+                <span class="gpu-stat-label">Viewers</span>
+                <span class="gpu-stat-value" id="aetheraWsViewers">—</span>
+              </div>
+              <div class="gpu-stat">
+                <span class="gpu-stat-label">Frames</span>
+                <span class="gpu-stat-value" id="aetheraFrameCount">—</span>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Quick Links -->
+          <div class="dreams-quick-links" style="margin-top: var(--space-md);">
+            <a href="#" class="quick-link" onclick="openDreamsViewer(event)">
+              <span class="quick-link-icon">🖼️</span>
+              <span>Open Dreams Viewer</span>
+            </a>
+            <a href="#" class="quick-link" onclick="openRunpodDashboard(event)">
+              <span class="quick-link-icon">☁️</span>
+              <span>RunPod Dashboard</span>
+            </a>
           </div>
         </div>
       </div>
