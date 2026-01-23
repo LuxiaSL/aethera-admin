@@ -398,6 +398,127 @@ router.post('/pods/dreamgen/stop', async (req, res) => {
   }
 });
 
+// ============================================================================
+// POD UPDATE ENDPOINTS (Pull latest Docker images)
+// Reference: https://docs.runpod.io/api-reference/pods/PATCH/pods/podId
+// ============================================================================
+
+/**
+ * POST /api/dreams/pods/update
+ * Update both pods (triggers reset and pulls latest images)
+ * Stops pods first, then updates sequentially
+ */
+router.post('/pods/update', async (req, res) => {
+  try {
+    const config = require('../config');
+    const results = {
+      success: true,
+      updates: [],
+      warnings: [],
+    };
+    
+    // Stop both pods first to ensure clean update
+    console.log('Stopping pods before update...');
+    try {
+      await dreams.stopDreams();
+    } catch (e) {
+      results.warnings.push(`Stop failed (may be expected): ${e.message}`);
+    }
+    
+    // Wait for pods to stop
+    await new Promise(r => setTimeout(r, 3000));
+    
+    // Update ComfyUI pod
+    if (config.RUNPOD_COMFYUI_POD_ID) {
+      try {
+        const result = await dreams.updatePod(config.RUNPOD_COMFYUI_POD_ID, {});
+        results.updates.push({ pod: 'comfyui', success: true, ...result });
+      } catch (error) {
+        results.updates.push({ pod: 'comfyui', success: false, error: error.message });
+        results.warnings.push(`ComfyUI update failed: ${error.message}`);
+      }
+    } else {
+      results.warnings.push('RUNPOD_COMFYUI_POD_ID not configured');
+    }
+    
+    // Update DreamGen pod
+    if (config.RUNPOD_DREAMGEN_POD_ID) {
+      try {
+        const result = await dreams.updatePod(config.RUNPOD_DREAMGEN_POD_ID, {});
+        results.updates.push({ pod: 'dreamgen', success: true, ...result });
+      } catch (error) {
+        results.updates.push({ pod: 'dreamgen', success: false, error: error.message });
+        results.warnings.push(`DreamGen update failed: ${error.message}`);
+      }
+    } else {
+      results.warnings.push('RUNPOD_DREAMGEN_POD_ID not configured');
+    }
+    
+    results.message = `Updated ${results.updates.filter(u => u.success).length} pod(s). They will pull latest images on next start.`;
+    res.json(results);
+  } catch (error) {
+    console.error('Pods update error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/dreams/pods/comfyui/update
+ * Update ComfyUI pod only (triggers reset and pulls latest image)
+ */
+router.post('/pods/comfyui/update', async (req, res) => {
+  try {
+    const config = require('../config');
+    if (!config.RUNPOD_COMFYUI_POD_ID) {
+      return res.status(400).json({ error: 'RUNPOD_COMFYUI_POD_ID not configured' });
+    }
+    
+    // Optionally stop first
+    if (req.body?.stopFirst) {
+      try {
+        await dreams.unregisterComfyUI();
+        await dreams.stopPod(config.RUNPOD_COMFYUI_POD_ID);
+        await new Promise(r => setTimeout(r, 2000));
+      } catch (e) {
+        console.log('Stop before update (may be expected):', e.message);
+      }
+    }
+    
+    const result = await dreams.updatePod(config.RUNPOD_COMFYUI_POD_ID, req.body?.updates || {});
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/dreams/pods/dreamgen/update
+ * Update DreamGen pod only (triggers reset and pulls latest image)
+ */
+router.post('/pods/dreamgen/update', async (req, res) => {
+  try {
+    const config = require('../config');
+    if (!config.RUNPOD_DREAMGEN_POD_ID) {
+      return res.status(400).json({ error: 'RUNPOD_DREAMGEN_POD_ID not configured' });
+    }
+    
+    // Optionally stop first
+    if (req.body?.stopFirst) {
+      try {
+        await dreams.stopPod(config.RUNPOD_DREAMGEN_POD_ID);
+        await new Promise(r => setTimeout(r, 2000));
+      } catch (e) {
+        console.log('Stop before update (may be expected):', e.message);
+      }
+    }
+    
+    const result = await dreams.updatePod(config.RUNPOD_DREAMGEN_POD_ID, req.body?.updates || {});
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 /**
  * GET /api/dreams/registry
  * Get ComfyUI registry status from Aethera
