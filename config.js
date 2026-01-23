@@ -90,9 +90,21 @@ const IRC_DB = path.join(AETHERA_DB_PATH, 'irc.sqlite');
 // DREAMS / RUNPOD
 // ============================================================================
 
+// API credentials
 const RUNPOD_API_KEY = process.env.RUNPOD_API_KEY || '';
+
+// Legacy serverless endpoint (for backwards compatibility)
 const RUNPOD_ENDPOINT_ID = process.env.RUNPOD_ENDPOINT_ID || '';
 const RUNPOD_API_URL = 'https://api.runpod.ai/v2';
+
+// Two-pod architecture pod IDs
+// Create pods manually in RunPod console, then set these IDs
+const RUNPOD_COMFYUI_POD_ID = process.env.RUNPOD_COMFYUI_POD_ID || '';
+const RUNPOD_DREAMGEN_POD_ID = process.env.RUNPOD_DREAMGEN_POD_ID || '';
+
+// Cost tracking (approximate hourly rates)
+const COMFYUI_COST_PER_HOUR = parseFloat(process.env.COMFYUI_COST_PER_HOUR || '0.20');
+const DREAMGEN_COST_PER_HOUR = parseFloat(process.env.DREAMGEN_COST_PER_HOUR || '0.10');
 
 // ============================================================================
 // SERVER
@@ -154,10 +166,16 @@ module.exports = {
   BLOG_DB,
   IRC_DB,
   
-  // RunPod
+  // RunPod (legacy serverless)
   RUNPOD_API_KEY,
   RUNPOD_ENDPOINT_ID,
   RUNPOD_API_URL,
+  
+  // RunPod (two-pod architecture)
+  RUNPOD_COMFYUI_POD_ID,
+  RUNPOD_DREAMGEN_POD_ID,
+  COMFYUI_COST_PER_HOUR,
+  DREAMGEN_COST_PER_HOUR,
   
   // Server
   PORT,

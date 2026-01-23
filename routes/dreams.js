@@ -218,6 +218,226 @@ router.get('/tracked-jobs', async (req, res) => {
 });
 
 // ============================================================================
+// TWO-POD ARCHITECTURE ENDPOINTS
+// ============================================================================
+// These endpoints manage the ComfyUI + DreamGen pod pair
+
+/**
+ * GET /api/dreams/pods/status
+ * Get comprehensive two-pod status (ComfyUI + DreamGen + Aethera + Registry)
+ */
+router.get('/pods/status', async (req, res) => {
+  try {
+    const status = await dreams.getDreamsStatus();
+    res.json(status);
+  } catch (error) {
+    console.error('Two-pod status error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/dreams/pods/start
+ * Start both pods in sequence (ComfyUI first, wait for registration, then DreamGen)
+ */
+router.post('/pods/start', async (req, res) => {
+  try {
+    // Check current state
+    const currentStatus = await dreams.getDreamsStatus();
+    if (currentStatus.state === 'running') {
+      return res.json({
+        success: true,
+        alreadyRunning: true,
+        message: 'Dreams system is already running',
+      });
+    }
+    
+    // Start the two-pod system
+    const result = await dreams.startDreams();
+    res.json(result);
+  } catch (error) {
+    console.error('Two-pod start error:', error);
+    res.status(500).json({ 
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * POST /api/dreams/pods/stop
+ * Stop both pods (DreamGen first, unregister, then ComfyUI)
+ */
+router.post('/pods/stop', async (req, res) => {
+  try {
+    const result = await dreams.stopDreams();
+    res.json(result);
+  } catch (error) {
+    console.error('Two-pod stop error:', error);
+    res.status(500).json({ 
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * GET /api/dreams/pods/comfyui
+ * Get ComfyUI pod status only
+ */
+router.get('/pods/comfyui', async (req, res) => {
+  try {
+    const config = require('../config');
+    if (!config.RUNPOD_COMFYUI_POD_ID) {
+      return res.json({ configured: false, error: 'RUNPOD_COMFYUI_POD_ID not set' });
+    }
+    
+    const status = await dreams.getPodStatus(config.RUNPOD_COMFYUI_POD_ID);
+    res.json({
+      configured: true,
+      pod: status,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/dreams/pods/dreamgen
+ * Get DreamGen pod status only
+ */
+router.get('/pods/dreamgen', async (req, res) => {
+  try {
+    const config = require('../config');
+    if (!config.RUNPOD_DREAMGEN_POD_ID) {
+      return res.json({ configured: false, error: 'RUNPOD_DREAMGEN_POD_ID not set' });
+    }
+    
+    const status = await dreams.getPodStatus(config.RUNPOD_DREAMGEN_POD_ID);
+    res.json({
+      configured: true,
+      pod: status,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/dreams/pods/comfyui/start
+ * Start ComfyUI pod only (for manual control)
+ */
+router.post('/pods/comfyui/start', async (req, res) => {
+  try {
+    const config = require('../config');
+    if (!config.RUNPOD_COMFYUI_POD_ID) {
+      return res.status(400).json({ error: 'RUNPOD_COMFYUI_POD_ID not configured' });
+    }
+    
+    const result = await dreams.startPod(config.RUNPOD_COMFYUI_POD_ID);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/dreams/pods/comfyui/stop
+ * Stop ComfyUI pod only (for manual control)
+ */
+router.post('/pods/comfyui/stop', async (req, res) => {
+  try {
+    const config = require('../config');
+    if (!config.RUNPOD_COMFYUI_POD_ID) {
+      return res.status(400).json({ error: 'RUNPOD_COMFYUI_POD_ID not configured' });
+    }
+    
+    // Unregister first
+    await dreams.unregisterComfyUI();
+    
+    const result = await dreams.stopPod(config.RUNPOD_COMFYUI_POD_ID);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/dreams/pods/dreamgen/start
+ * Start DreamGen pod only (for manual control)
+ */
+router.post('/pods/dreamgen/start', async (req, res) => {
+  try {
+    const config = require('../config');
+    if (!config.RUNPOD_DREAMGEN_POD_ID) {
+      return res.status(400).json({ error: 'RUNPOD_DREAMGEN_POD_ID not configured' });
+    }
+    
+    const result = await dreams.startPod(config.RUNPOD_DREAMGEN_POD_ID);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/dreams/pods/dreamgen/stop
+ * Stop DreamGen pod only (for manual control)
+ */
+router.post('/pods/dreamgen/stop', async (req, res) => {
+  try {
+    const config = require('../config');
+    if (!config.RUNPOD_DREAMGEN_POD_ID) {
+      return res.status(400).json({ error: 'RUNPOD_DREAMGEN_POD_ID not configured' });
+    }
+    
+    const result = await dreams.stopPod(config.RUNPOD_DREAMGEN_POD_ID);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/dreams/registry
+ * Get ComfyUI registry status from Aethera
+ */
+router.get('/registry', async (req, res) => {
+  try {
+    const status = await dreams.getComfyUIRegistryStatus();
+    res.json(status);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/dreams/state
+ * Get saved generation state info
+ */
+router.get('/state', async (req, res) => {
+  try {
+    const info = await dreams.getStateInfo();
+    res.json(info);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * DELETE /api/dreams/state
+ * Clear saved generation state (fresh start)
+ */
+router.delete('/state', async (req, res) => {
+  try {
+    const result = await dreams.clearState();
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================================================
 // EXPORTS
 // ============================================================================
 
