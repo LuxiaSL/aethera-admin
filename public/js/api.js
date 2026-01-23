@@ -400,6 +400,14 @@ const api = {
     async clearState() {
       return api.request('/dreams/state', { method: 'DELETE' });
     },
+    
+    /**
+     * Get billing info for dream pods
+     * @param {string} period - 'day', 'week', 'month'
+     */
+    async billing(period = 'day') {
+      return api.request(`/dreams/billing?period=${period}`);
+    },
   },
   
   // ============================================================================

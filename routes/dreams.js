@@ -559,6 +559,28 @@ router.delete('/state', async (req, res) => {
 });
 
 // ============================================================================
+// BILLING ENDPOINTS
+// Reference: https://docs.runpod.io/api-reference/billing/GET/billing/pods
+// ============================================================================
+
+/**
+ * GET /api/dreams/billing
+ * Get billing info for dream pods
+ * Query params:
+ *   - period: 'day', 'week', 'month' (default: 'day')
+ */
+router.get('/billing', async (req, res) => {
+  try {
+    const period = req.query.period || 'day';
+    const billing = await dreams.getDreamsBilling(period);
+    res.json(billing);
+  } catch (error) {
+    console.error('Billing error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================================================
 // EXPORTS
 // ============================================================================
 
