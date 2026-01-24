@@ -282,19 +282,44 @@ router.post('/pods/stop', async (req, res) => {
 });
 
 /**
+ * Helper to get pod ID by type (uses discovery, falls back to config)
+ */
+async function getPodIdByType(podType) {
+  const config = require('../config');
+  
+  try {
+    const podIds = await dreams.getCurrentPodIds();
+    if (podType === 'comfyui' && podIds.comfyuiPodId) {
+      return podIds.comfyuiPodId;
+    }
+    if (podType === 'dreamgen' && podIds.dreamgenPodId) {
+      return podIds.dreamgenPodId;
+    }
+  } catch (e) {
+    console.warn(`Pod discovery failed for ${podType}:`, e.message);
+  }
+  
+  // Fall back to config
+  if (podType === 'comfyui') return config.RUNPOD_COMFYUI_POD_ID;
+  if (podType === 'dreamgen') return config.RUNPOD_DREAMGEN_POD_ID;
+  return null;
+}
+
+/**
  * GET /api/dreams/pods/comfyui
  * Get ComfyUI pod status only
  */
 router.get('/pods/comfyui', async (req, res) => {
   try {
-    const config = require('../config');
-    if (!config.RUNPOD_COMFYUI_POD_ID) {
-      return res.json({ configured: false, error: 'RUNPOD_COMFYUI_POD_ID not set' });
+    const podId = await getPodIdByType('comfyui');
+    if (!podId) {
+      return res.json({ configured: false, error: 'ComfyUI pod not found (not discovered or configured)' });
     }
     
-    const status = await dreams.getPodStatus(config.RUNPOD_COMFYUI_POD_ID);
+    const status = await dreams.getPodStatus(podId);
     res.json({
       configured: true,
+      podId: podId,
       pod: status,
     });
   } catch (error) {
@@ -308,14 +333,15 @@ router.get('/pods/comfyui', async (req, res) => {
  */
 router.get('/pods/dreamgen', async (req, res) => {
   try {
-    const config = require('../config');
-    if (!config.RUNPOD_DREAMGEN_POD_ID) {
-      return res.json({ configured: false, error: 'RUNPOD_DREAMGEN_POD_ID not set' });
+    const podId = await getPodIdByType('dreamgen');
+    if (!podId) {
+      return res.json({ configured: false, error: 'DreamGen pod not found (not discovered or configured)' });
     }
     
-    const status = await dreams.getPodStatus(config.RUNPOD_DREAMGEN_POD_ID);
+    const status = await dreams.getPodStatus(podId);
     res.json({
       configured: true,
+      podId: podId,
       pod: status,
     });
   } catch (error) {
@@ -329,12 +355,12 @@ router.get('/pods/dreamgen', async (req, res) => {
  */
 router.post('/pods/comfyui/start', async (req, res) => {
   try {
-    const config = require('../config');
-    if (!config.RUNPOD_COMFYUI_POD_ID) {
-      return res.status(400).json({ error: 'RUNPOD_COMFYUI_POD_ID not configured' });
+    const podId = await getPodIdByType('comfyui');
+    if (!podId) {
+      return res.status(400).json({ error: 'ComfyUI pod not found - use "Ensure" to create one' });
     }
     
-    const result = await dreams.startPod(config.RUNPOD_COMFYUI_POD_ID);
+    const result = await dreams.startPod(podId);
     res.json(result);
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -347,15 +373,15 @@ router.post('/pods/comfyui/start', async (req, res) => {
  */
 router.post('/pods/comfyui/stop', async (req, res) => {
   try {
-    const config = require('../config');
-    if (!config.RUNPOD_COMFYUI_POD_ID) {
-      return res.status(400).json({ error: 'RUNPOD_COMFYUI_POD_ID not configured' });
+    const podId = await getPodIdByType('comfyui');
+    if (!podId) {
+      return res.status(400).json({ error: 'ComfyUI pod not found' });
     }
     
     // Unregister first
     await dreams.unregisterComfyUI();
     
-    const result = await dreams.stopPod(config.RUNPOD_COMFYUI_POD_ID);
+    const result = await dreams.stopPod(podId);
     res.json(result);
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -368,12 +394,12 @@ router.post('/pods/comfyui/stop', async (req, res) => {
  */
 router.post('/pods/dreamgen/start', async (req, res) => {
   try {
-    const config = require('../config');
-    if (!config.RUNPOD_DREAMGEN_POD_ID) {
-      return res.status(400).json({ error: 'RUNPOD_DREAMGEN_POD_ID not configured' });
+    const podId = await getPodIdByType('dreamgen');
+    if (!podId) {
+      return res.status(400).json({ error: 'DreamGen pod not found - use "Ensure" to create one' });
     }
     
-    const result = await dreams.startPod(config.RUNPOD_DREAMGEN_POD_ID);
+    const result = await dreams.startPod(podId);
     res.json(result);
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -386,12 +412,12 @@ router.post('/pods/dreamgen/start', async (req, res) => {
  */
 router.post('/pods/dreamgen/stop', async (req, res) => {
   try {
-    const config = require('../config');
-    if (!config.RUNPOD_DREAMGEN_POD_ID) {
-      return res.status(400).json({ error: 'RUNPOD_DREAMGEN_POD_ID not configured' });
+    const podId = await getPodIdByType('dreamgen');
+    if (!podId) {
+      return res.status(400).json({ error: 'DreamGen pod not found' });
     }
     
-    const result = await dreams.stopPod(config.RUNPOD_DREAMGEN_POD_ID);
+    const result = await dreams.stopPod(podId);
     res.json(result);
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -410,7 +436,6 @@ router.post('/pods/dreamgen/stop', async (req, res) => {
  */
 router.post('/pods/update', async (req, res) => {
   try {
-    const config = require('../config');
     const results = {
       success: true,
       updates: [],
@@ -428,30 +453,34 @@ router.post('/pods/update', async (req, res) => {
     // Wait for pods to stop
     await new Promise(r => setTimeout(r, 3000));
     
+    // Get pod IDs via discovery
+    const comfyuiPodId = await getPodIdByType('comfyui');
+    const dreamgenPodId = await getPodIdByType('dreamgen');
+    
     // Update ComfyUI pod
-    if (config.RUNPOD_COMFYUI_POD_ID) {
+    if (comfyuiPodId) {
       try {
-        const result = await dreams.updatePod(config.RUNPOD_COMFYUI_POD_ID, {});
-        results.updates.push({ pod: 'comfyui', success: true, ...result });
+        const result = await dreams.updatePod(comfyuiPodId, {});
+        results.updates.push({ pod: 'comfyui', podId: comfyuiPodId, success: true, ...result });
       } catch (error) {
         results.updates.push({ pod: 'comfyui', success: false, error: error.message });
         results.warnings.push(`ComfyUI update failed: ${error.message}`);
       }
     } else {
-      results.warnings.push('RUNPOD_COMFYUI_POD_ID not configured');
+      results.warnings.push('ComfyUI pod not found');
     }
     
     // Update DreamGen pod
-    if (config.RUNPOD_DREAMGEN_POD_ID) {
+    if (dreamgenPodId) {
       try {
-        const result = await dreams.updatePod(config.RUNPOD_DREAMGEN_POD_ID, {});
-        results.updates.push({ pod: 'dreamgen', success: true, ...result });
+        const result = await dreams.updatePod(dreamgenPodId, {});
+        results.updates.push({ pod: 'dreamgen', podId: dreamgenPodId, success: true, ...result });
       } catch (error) {
         results.updates.push({ pod: 'dreamgen', success: false, error: error.message });
         results.warnings.push(`DreamGen update failed: ${error.message}`);
       }
     } else {
-      results.warnings.push('RUNPOD_DREAMGEN_POD_ID not configured');
+      results.warnings.push('DreamGen pod not found');
     }
     
     results.message = `Updated ${results.updates.filter(u => u.success).length} pod(s). They will pull latest images on next start.`;
@@ -468,23 +497,23 @@ router.post('/pods/update', async (req, res) => {
  */
 router.post('/pods/comfyui/update', async (req, res) => {
   try {
-    const config = require('../config');
-    if (!config.RUNPOD_COMFYUI_POD_ID) {
-      return res.status(400).json({ error: 'RUNPOD_COMFYUI_POD_ID not configured' });
+    const podId = await getPodIdByType('comfyui');
+    if (!podId) {
+      return res.status(400).json({ error: 'ComfyUI pod not found' });
     }
     
     // Optionally stop first
     if (req.body?.stopFirst) {
       try {
         await dreams.unregisterComfyUI();
-        await dreams.stopPod(config.RUNPOD_COMFYUI_POD_ID);
+        await dreams.stopPod(podId);
         await new Promise(r => setTimeout(r, 2000));
       } catch (e) {
         console.log('Stop before update (may be expected):', e.message);
       }
     }
     
-    const result = await dreams.updatePod(config.RUNPOD_COMFYUI_POD_ID, req.body?.updates || {});
+    const result = await dreams.updatePod(podId, req.body?.updates || {});
     res.json(result);
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -497,22 +526,22 @@ router.post('/pods/comfyui/update', async (req, res) => {
  */
 router.post('/pods/dreamgen/update', async (req, res) => {
   try {
-    const config = require('../config');
-    if (!config.RUNPOD_DREAMGEN_POD_ID) {
-      return res.status(400).json({ error: 'RUNPOD_DREAMGEN_POD_ID not configured' });
+    const podId = await getPodIdByType('dreamgen');
+    if (!podId) {
+      return res.status(400).json({ error: 'DreamGen pod not found' });
     }
     
     // Optionally stop first
     if (req.body?.stopFirst) {
       try {
-        await dreams.stopPod(config.RUNPOD_DREAMGEN_POD_ID);
+        await dreams.stopPod(podId);
         await new Promise(r => setTimeout(r, 2000));
       } catch (e) {
         console.log('Stop before update (may be expected):', e.message);
       }
     }
     
-    const result = await dreams.updatePod(config.RUNPOD_DREAMGEN_POD_ID, req.body?.updates || {});
+    const result = await dreams.updatePod(podId, req.body?.updates || {});
     res.json(result);
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -530,13 +559,20 @@ router.post('/pods/dreamgen/update', async (req, res) => {
  */
 router.delete('/pods/comfyui', async (req, res) => {
   try {
-    const config = require('../config');
-    if (!config.RUNPOD_COMFYUI_POD_ID) {
-      return res.status(400).json({ error: 'RUNPOD_COMFYUI_POD_ID not configured' });
+    const podId = await getPodIdByType('comfyui');
+    if (!podId) {
+      return res.status(400).json({ error: 'ComfyUI pod not found' });
     }
     
-    const result = await dreams.terminatePod(config.RUNPOD_COMFYUI_POD_ID);
-    res.json(result);
+    // Unregister from VPS first
+    try {
+      await dreams.unregisterComfyUI();
+    } catch (e) {
+      console.log('Unregister before terminate (may be expected):', e.message);
+    }
+    
+    const result = await dreams.terminatePod(podId);
+    res.json({ ...result, deletedPodId: podId });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -549,13 +585,13 @@ router.delete('/pods/comfyui', async (req, res) => {
  */
 router.delete('/pods/dreamgen', async (req, res) => {
   try {
-    const config = require('../config');
-    if (!config.RUNPOD_DREAMGEN_POD_ID) {
-      return res.status(400).json({ error: 'RUNPOD_DREAMGEN_POD_ID not configured' });
+    const podId = await getPodIdByType('dreamgen');
+    if (!podId) {
+      return res.status(400).json({ error: 'DreamGen pod not found' });
     }
     
-    const result = await dreams.terminatePod(config.RUNPOD_DREAMGEN_POD_ID);
-    res.json(result);
+    const result = await dreams.terminatePod(podId);
+    res.json({ ...result, deletedPodId: podId });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
