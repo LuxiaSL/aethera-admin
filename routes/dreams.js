@@ -823,6 +823,10 @@ router.post('/lifecycle/ensure/:podType', async (req, res) => {
       secretOverrides: req.body?.secretOverrides || {},
       maxRecreateAttempts: req.body?.maxRecreateAttempts || 2,
       waitForRunning: req.body?.waitForRunning || false,
+      // verifyOnly defaults to true (verify pod works then stop)
+      // Set verifyOnly: false or leaveRunning: true to keep pod running
+      verifyOnly: req.body?.verifyOnly !== false,  // default true unless explicitly false
+      leaveRunning: req.body?.leaveRunning || false,
     };
     
     const result = await dreams.ensurePod(podType, options);
