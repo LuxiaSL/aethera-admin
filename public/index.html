@@ -589,6 +589,96 @@
             </div>
           </div>
           
+          <!-- Lifecycle Management (New) -->
+          <div class="runpod-info lifecycle-section" style="margin-top: var(--space-md);">
+            <div class="runpod-info-title">
+              <span>🔄</span>
+              <span>Lifecycle Management</span>
+              <span id="lifecycleModeBadge" class="lifecycle-mode-badge" style="font-size: var(--text-xs); background: var(--bg-tertiary); padding: 2px 8px; border-radius: var(--radius-sm); margin-left: var(--space-sm);">Auto</span>
+            </div>
+            <p style="font-size: var(--text-sm); color: var(--text-secondary); margin-bottom: var(--space-sm);">
+              Pods are automatically discovered by name. If GPUs are unavailable, pods will be recreated.
+            </p>
+            
+            <!-- Discovery Status -->
+            <div class="lifecycle-discovery" style="background: var(--bg-tertiary); border-radius: var(--radius-sm); padding: var(--space-sm); margin-bottom: var(--space-md);">
+              <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-sm);">
+                <div class="discovery-item">
+                  <span class="discovery-label" style="font-size: var(--text-xs); color: var(--text-muted);">ComfyUI Pod</span>
+                  <div class="discovery-value" style="font-family: monospace; font-size: var(--text-sm);">
+                    <span id="discoveryComfyui">—</span>
+                  </div>
+                </div>
+                <div class="discovery-item">
+                  <span class="discovery-label" style="font-size: var(--text-xs); color: var(--text-muted);">DreamGen Pod</span>
+                  <div class="discovery-value" style="font-family: monospace; font-size: var(--text-sm);">
+                    <span id="discoveryDreamgen">—</span>
+                  </div>
+                </div>
+                <div class="discovery-item">
+                  <span class="discovery-label" style="font-size: var(--text-xs); color: var(--text-muted);">Total Pods</span>
+                  <span id="discoveryTotal" style="font-family: monospace; font-size: var(--text-sm);">—</span>
+                </div>
+                <div class="discovery-item">
+                  <span class="discovery-label" style="font-size: var(--text-xs); color: var(--text-muted);">Secrets Config</span>
+                  <span id="discoverySecretsStatus" style="font-family: monospace; font-size: var(--text-sm);">—</span>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Template Info (Collapsible) -->
+            <details class="lifecycle-templates" style="margin-bottom: var(--space-md);">
+              <summary style="cursor: pointer; font-size: var(--text-sm); color: var(--text-secondary); margin-bottom: var(--space-sm);">
+                📋 Pod Templates (click to expand)
+              </summary>
+              <div style="background: var(--bg-tertiary); border-radius: var(--radius-sm); padding: var(--space-sm); margin-top: var(--space-sm);">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-md);">
+                  <div class="template-card">
+                    <div style="font-weight: 600; margin-bottom: var(--space-xs);">ComfyUI</div>
+                    <div id="templateComfyui" style="font-size: var(--text-xs); color: var(--text-muted);">Loading...</div>
+                  </div>
+                  <div class="template-card">
+                    <div style="font-weight: 600; margin-bottom: var(--space-xs);">DreamGen</div>
+                    <div id="templateDreamgen" style="font-size: var(--text-xs); color: var(--text-muted);">Loading...</div>
+                  </div>
+                </div>
+              </div>
+            </details>
+            
+            <!-- Manual Lifecycle Actions -->
+            <div class="gpu-actions" style="flex-wrap: wrap; gap: var(--space-sm);">
+              <button class="btn btn-secondary" onclick="discoverPods()" title="Re-scan RunPod for matching pods">
+                🔍 Discover Pods
+              </button>
+              <button class="btn btn-ghost" onclick="ensureComfyUI()" title="Ensure ComfyUI pod exists (create if needed)">
+                ⚡ Ensure ComfyUI
+              </button>
+              <button class="btn btn-ghost" onclick="ensureDreamGen()" title="Ensure DreamGen pod exists (create if needed)">
+                ⚡ Ensure DreamGen
+              </button>
+            </div>
+            
+            <!-- Danger Zone (Collapsible) -->
+            <details class="lifecycle-danger" style="margin-top: var(--space-md);">
+              <summary style="cursor: pointer; font-size: var(--text-sm); color: var(--error);">
+                ⚠️ Danger Zone
+              </summary>
+              <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid var(--error); border-radius: var(--radius-sm); padding: var(--space-sm); margin-top: var(--space-sm);">
+                <p style="font-size: var(--text-xs); color: var(--text-muted); margin-bottom: var(--space-sm);">
+                  These actions permanently delete pods. Use with caution.
+                </p>
+                <div class="gpu-actions" style="flex-wrap: wrap; gap: var(--space-sm);">
+                  <button class="btn btn-danger" onclick="terminateComfyUIWithConfirm()" style="font-size: var(--text-xs);">
+                    🗑️ Delete ComfyUI Pod
+                  </button>
+                  <button class="btn btn-danger" onclick="terminateDreamGenWithConfirm()" style="font-size: var(--text-xs);">
+                    🗑️ Delete DreamGen Pod
+                  </button>
+                </div>
+              </div>
+            </details>
+          </div>
+          
           <!-- Aethera Info Panel -->
           <div class="aethera-info" style="margin-top: var(--space-md);">
             <div class="aethera-info-title">

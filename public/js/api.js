@@ -446,6 +446,61 @@ const api = {
     async billing(period = 'day') {
       return api.request(`/dreams/billing?period=${period}`);
     },
+    
+    // === Lifecycle Management ===
+    
+    /**
+     * List all RunPod pods in the account
+     * @param {boolean} refresh - Force cache refresh
+     */
+    async listPods(refresh = false) {
+      return api.request(`/dreams/lifecycle/pods?refresh=${refresh}`);
+    },
+    
+    /**
+     * Discover ComfyUI and DreamGen pods by name
+     */
+    async discoverPods() {
+      return api.request('/dreams/lifecycle/discover');
+    },
+    
+    /**
+     * Get pod configuration templates
+     */
+    async getTemplates() {
+      return api.request('/dreams/lifecycle/templates');
+    },
+    
+    /**
+     * Ensure a pod exists and is running (create if needed)
+     * @param {string} podType - 'comfyui' or 'dreamgen'
+     * @param {Object} options - Options for pod management
+     */
+    async ensurePod(podType, options = {}) {
+      return api.request(`/dreams/lifecycle/ensure/${podType}`, {
+        method: 'POST',
+        body: options,
+      });
+    },
+    
+    /**
+     * Force create a new pod from template
+     * @param {string} podType - 'comfyui' or 'dreamgen'
+     * @param {Object} secretOverrides - Secret overrides
+     */
+    async createPod(podType, secretOverrides = {}) {
+      return api.request(`/dreams/lifecycle/create/${podType}`, {
+        method: 'POST',
+        body: { secretOverrides },
+      });
+    },
+    
+    /**
+     * Get secrets configuration status (no actual secrets)
+     */
+    async secretsStatus() {
+      return api.request('/dreams/secrets-status');
+    },
   },
   
   // ============================================================================

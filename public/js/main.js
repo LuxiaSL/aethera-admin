@@ -1875,6 +1875,9 @@ let dreamsStatus = null;
 async function loadDreams() {
   // Load two-pod status (primary)
   refreshPodsStatus();
+  
+  // Load lifecycle management data
+  loadLifecycleManagement();
 }
 
 /**
@@ -2475,6 +2478,222 @@ window.updateComfyUIPod = updateComfyUIPod;
 window.updateDreamGenPod = updateDreamGenPod;
 window.clearSavedState = clearSavedState;
 window.clearPodErrors = clearPodErrors;
+
+// ============================================================================
+// LIFECYCLE MANAGEMENT (NEW)
+// ============================================================================
+
+/**
+ * Discover pods from RunPod and update the UI
+ */
+async function discoverPods() {
+  try {
+    showToast('Discovering pods...', 'info');
+    const discovery = await api.dreams.discoverPods();
+    
+    // Update discovery display
+    updateDiscoveryDisplay(discovery);
+    
+    // Also refresh templates and secrets status
+    await loadLifecycleTemplates();
+    await loadSecretsStatus();
+    
+    showToast(`Found ${discovery.totalPods} pods`, 'success');
+    
+    // Refresh main status
+    await refreshPodsStatus();
+  } catch (error) {
+    showToast(error.message || 'Failed to discover pods', 'error');
+  }
+}
+
+/**
+ * Update the discovery display with pod info
+ */
+function updateDiscoveryDisplay(discovery) {
+  // ComfyUI
+  const comfyuiEl = document.getElementById('discoveryComfyui');
+  if (discovery.comfyui) {
+    comfyuiEl.innerHTML = `<span style="color: var(--success);">✓</span> ${discovery.comfyui.name} <span style="color: var(--text-muted);">(${discovery.comfyui.status})</span>`;
+  } else {
+    comfyuiEl.innerHTML = `<span style="color: var(--warning);">○</span> Not found`;
+  }
+  
+  // DreamGen
+  const dreamgenEl = document.getElementById('discoveryDreamgen');
+  if (discovery.dreamgen) {
+    dreamgenEl.innerHTML = `<span style="color: var(--success);">✓</span> ${discovery.dreamgen.name} <span style="color: var(--text-muted);">(${discovery.dreamgen.status})</span>`;
+  } else {
+    dreamgenEl.innerHTML = `<span style="color: var(--warning);">○</span> Not found`;
+  }
+  
+  // Total pods
+  document.getElementById('discoveryTotal').textContent = discovery.totalPods || 0;
+}
+
+/**
+ * Load lifecycle templates info
+ */
+async function loadLifecycleTemplates() {
+  try {
+    const templates = await api.dreams.getTemplates();
+    
+    // ComfyUI template
+    if (templates.comfyui) {
+      document.getElementById('templateComfyui').innerHTML = `
+        <div>GPU: ${templates.comfyui.gpuTypeIds?.slice(0, 2).join(', ') || '—'}</div>
+        <div>Image: ${templates.comfyui.imageName || '—'}</div>
+        <div>Cost: ~$${templates.comfyui.estimatedCostPerHour || '?'}/hr</div>
+      `;
+    }
+    
+    // DreamGen template
+    if (templates.dreamgen) {
+      document.getElementById('templateDreamgen').innerHTML = `
+        <div>GPU: ${templates.dreamgen.gpuTypeIds?.slice(0, 2).join(', ') || '—'}</div>
+        <div>Image: ${templates.dreamgen.imageName || '—'}</div>
+        <div>Cost: ~$${templates.dreamgen.estimatedCostPerHour || '?'}/hr</div>
+      `;
+    }
+  } catch (error) {
+    console.error('Failed to load templates:', error);
+  }
+}
+
+/**
+ * Load secrets configuration status
+ */
+async function loadSecretsStatus() {
+  try {
+    const status = await api.dreams.secretsStatus();
+    
+    const el = document.getElementById('discoverySecretsStatus');
+    if (status.secretsConfigured) {
+      el.innerHTML = `<span style="color: var(--success);">✓</span> Configured`;
+    } else {
+      const missing = [];
+      if (!status.hasDreamGenAuthToken) missing.push('AUTH_TOKEN');
+      if (!status.hasComfyuiAuthPass) missing.push('COMFYUI_PASS');
+      el.innerHTML = `<span style="color: var(--warning);">⚠</span> Missing: ${missing.join(', ')}`;
+    }
+  } catch (error) {
+    document.getElementById('discoverySecretsStatus').innerHTML = `<span style="color: var(--error);">✗</span> Error`;
+  }
+}
+
+/**
+ * Ensure ComfyUI pod exists and is running
+ */
+async function ensureComfyUI() {
+  try {
+    showToast('Ensuring ComfyUI pod...', 'info');
+    const result = await api.dreams.ensurePod('comfyui');
+    
+    if (result.success) {
+      const action = result.action === 'created' ? 'created' : 
+                     result.action === 'recreated' ? 'recreated' : 
+                     result.action === 'started' ? 'started' :
+                     result.action === 'already_running' ? 'already running' : 'ensured';
+      showToast(`ComfyUI pod ${action}!`, 'success');
+      await discoverPods();
+    } else {
+      showToast(result.error || 'Failed to ensure ComfyUI pod', 'error');
+    }
+  } catch (error) {
+    showToast(error.message || 'Failed to ensure ComfyUI pod', 'error');
+  }
+}
+
+/**
+ * Ensure DreamGen pod exists and is running
+ */
+async function ensureDreamGen() {
+  try {
+    showToast('Ensuring DreamGen pod...', 'info');
+    const result = await api.dreams.ensurePod('dreamgen');
+    
+    if (result.success) {
+      const action = result.action === 'created' ? 'created' : 
+                     result.action === 'recreated' ? 'recreated' : 
+                     result.action === 'started' ? 'started' :
+                     result.action === 'already_running' ? 'already running' : 'ensured';
+      showToast(`DreamGen pod ${action}!`, 'success');
+      await discoverPods();
+    } else {
+      showToast(result.error || 'Failed to ensure DreamGen pod', 'error');
+    }
+  } catch (error) {
+    showToast(error.message || 'Failed to ensure DreamGen pod', 'error');
+  }
+}
+
+/**
+ * Terminate ComfyUI pod with confirmation
+ */
+async function terminateComfyUIWithConfirm() {
+  if (!confirm('⚠️ DELETE ComfyUI pod?\n\nThis will permanently delete the pod. You will need to recreate it (which happens automatically on next start).\n\nAre you sure?')) {
+    return;
+  }
+  
+  try {
+    showToast('Terminating ComfyUI pod...', 'info');
+    const result = await api.dreams.terminateComfyUI();
+    
+    if (result.success) {
+      showToast('ComfyUI pod terminated', 'success');
+      await discoverPods();
+    }
+  } catch (error) {
+    showToast(error.message || 'Failed to terminate ComfyUI pod', 'error');
+  }
+}
+
+/**
+ * Terminate DreamGen pod with confirmation
+ */
+async function terminateDreamGenWithConfirm() {
+  if (!confirm('⚠️ DELETE DreamGen pod?\n\nThis will permanently delete the pod. You will need to recreate it (which happens automatically on next start).\n\nAre you sure?')) {
+    return;
+  }
+  
+  try {
+    showToast('Terminating DreamGen pod...', 'info');
+    const result = await api.dreams.terminateDreamGen();
+    
+    if (result.success) {
+      showToast('DreamGen pod terminated', 'success');
+      await discoverPods();
+    }
+  } catch (error) {
+    showToast(error.message || 'Failed to terminate DreamGen pod', 'error');
+  }
+}
+
+/**
+ * Load lifecycle management UI (called when Dreams page loads)
+ */
+async function loadLifecycleManagement() {
+  try {
+    // Load all lifecycle data in parallel
+    const [discovery, _templates, _secrets] = await Promise.all([
+      api.dreams.discoverPods().catch(() => ({ comfyui: null, dreamgen: null, totalPods: 0 })),
+      loadLifecycleTemplates().catch(() => {}),
+      loadSecretsStatus().catch(() => {}),
+    ]);
+    
+    updateDiscoveryDisplay(discovery);
+  } catch (error) {
+    console.error('Failed to load lifecycle management:', error);
+  }
+}
+
+// Make lifecycle functions global
+window.discoverPods = discoverPods;
+window.ensureComfyUI = ensureComfyUI;
+window.ensureDreamGen = ensureDreamGen;
+window.terminateComfyUIWithConfirm = terminateComfyUIWithConfirm;
+window.terminateDreamGenWithConfirm = terminateDreamGenWithConfirm;
+window.loadLifecycleManagement = loadLifecycleManagement;
 
 // ============================================================================
 // BLOG MANAGEMENT

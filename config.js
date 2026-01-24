@@ -98,13 +98,35 @@ const RUNPOD_ENDPOINT_ID = process.env.RUNPOD_ENDPOINT_ID || '';
 const RUNPOD_API_URL = 'https://api.runpod.ai/v2';
 
 // Two-pod architecture pod IDs
-// Create pods manually in RunPod console, then set these IDs
+// NOTE: These are now OPTIONAL - pods can be discovered by name automatically
+// If set, they act as fallbacks when discovery fails
 const RUNPOD_COMFYUI_POD_ID = process.env.RUNPOD_COMFYUI_POD_ID || '';
 const RUNPOD_DREAMGEN_POD_ID = process.env.RUNPOD_DREAMGEN_POD_ID || '';
 
-// Cost tracking (approximate hourly rates)
-const COMFYUI_COST_PER_HOUR = parseFloat(process.env.COMFYUI_COST_PER_HOUR || '0.20');
-const DREAMGEN_COST_PER_HOUR = parseFloat(process.env.DREAMGEN_COST_PER_HOUR || '0.10');
+// Cost tracking (approximate hourly rates - updated for 4090/A4000)
+const COMFYUI_COST_PER_HOUR = parseFloat(process.env.COMFYUI_COST_PER_HOUR || '0.44');
+const DREAMGEN_COST_PER_HOUR = parseFloat(process.env.DREAMGEN_COST_PER_HOUR || '0.20');
+
+// ============================================================================
+// POD SECRETS (for automatic pod creation)
+// ============================================================================
+// These secrets are injected into pods when created via lifecycle management
+
+// ComfyUI authentication (nginx basic auth)
+const COMFYUI_AUTH_USER = process.env.COMFYUI_AUTH_USER || 'dreamgen';
+const COMFYUI_AUTH_PASS = process.env.COMFYUI_AUTH_PASS || '';
+
+// Shared auth token between DreamGen pods and VPS
+const DREAM_GEN_AUTH_TOKEN = process.env.DREAM_GEN_AUTH_TOKEN || '';
+
+// VPS URLs for pod configuration
+const VPS_BASE_URL = process.env.VPS_BASE_URL || 'https://aetherawi.red';
+const VPS_WEBSOCKET_URL = process.env.VPS_WEBSOCKET_URL || 'wss://aetherawi.red/ws/gpu';
+const VPS_REGISTER_URL = process.env.VPS_REGISTER_URL || `${VPS_BASE_URL}/api/dreams/comfyui/register`;
+
+// Pod secret bootstrap token (optional - for pods to retrieve secrets from admin)
+// If set, pods can call GET /api/dreams/secrets?token=<this> to get their secrets
+const POD_BOOTSTRAP_TOKEN = process.env.POD_BOOTSTRAP_TOKEN || '';
 
 // ============================================================================
 // SERVER
@@ -176,6 +198,15 @@ module.exports = {
   RUNPOD_DREAMGEN_POD_ID,
   COMFYUI_COST_PER_HOUR,
   DREAMGEN_COST_PER_HOUR,
+  
+  // Pod secrets (for lifecycle management)
+  COMFYUI_AUTH_USER,
+  COMFYUI_AUTH_PASS,
+  DREAM_GEN_AUTH_TOKEN,
+  VPS_BASE_URL,
+  VPS_WEBSOCKET_URL,
+  VPS_REGISTER_URL,
+  POD_BOOTSTRAP_TOKEN,
   
   // Server
   PORT,

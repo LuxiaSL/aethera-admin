@@ -676,6 +676,201 @@ router.get('/billing', async (req, res) => {
 });
 
 // ============================================================================
+// LIFECYCLE MANAGEMENT ENDPOINTS (NEW)
+// ============================================================================
+// These endpoints support automatic pod discovery and creation
+
+/**
+ * GET /api/dreams/lifecycle/pods
+ * List all RunPod pods in the account
+ */
+router.get('/lifecycle/pods', async (req, res) => {
+  try {
+    const forceRefresh = req.query.refresh === 'true';
+    const pods = await dreams.listPods(forceRefresh);
+    res.json({
+      count: pods.length,
+      pods: pods.map(pod => ({
+        id: pod.id,
+        name: pod.name,
+        status: pod.desiredStatus,
+        gpuType: pod.machine?.gpuType?.displayName || null,
+        imageName: pod.imageName,
+        createdAt: pod.createdAt,
+      })),
+    });
+  } catch (error) {
+    console.error('List pods error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/dreams/lifecycle/discover
+ * Discover ComfyUI and DreamGen pods by name
+ */
+router.get('/lifecycle/discover', async (req, res) => {
+  try {
+    const discovered = await dreams.discoverDreamPods();
+    const podIds = await dreams.getCurrentPodIds();
+    
+    res.json({
+      comfyui: discovered.comfyui ? {
+        id: discovered.comfyui.id,
+        name: discovered.comfyui.name,
+        status: discovered.comfyui.desiredStatus,
+        gpuType: discovered.comfyui.machine?.gpuType?.displayName,
+      } : null,
+      dreamgen: discovered.dreamgen ? {
+        id: discovered.dreamgen.id,
+        name: discovered.dreamgen.name,
+        status: discovered.dreamgen.desiredStatus,
+        gpuType: discovered.dreamgen.machine?.gpuType?.displayName,
+      } : null,
+      currentIds: podIds,
+      totalPods: discovered.allPods.length,
+    });
+  } catch (error) {
+    console.error('Discover pods error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/dreams/lifecycle/templates
+ * Get pod configuration templates
+ */
+router.get('/lifecycle/templates', async (req, res) => {
+  try {
+    const templates = dreams.getPodTemplates();
+    
+    // Redact sensitive info
+    const redacted = {};
+    for (const [key, template] of Object.entries(templates)) {
+      redacted[key] = {
+        ...template,
+        env: Object.fromEntries(
+          Object.entries(template.env || {}).map(([k, v]) => [
+            k,
+            k.toLowerCase().includes('pass') || k.toLowerCase().includes('token') || k.toLowerCase().includes('secret')
+              ? '***'
+              : v,
+          ])
+        ),
+      };
+    }
+    
+    res.json(redacted);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/dreams/lifecycle/ensure/:podType
+ * Ensure a pod exists and is running (create if needed)
+ * 
+ * This is the main lifecycle management endpoint:
+ * 1. Discovers existing pod by name
+ * 2. Starts if exists, creates if not
+ * 3. Handles GPU unavailability by recreating
+ */
+router.post('/lifecycle/ensure/:podType', async (req, res) => {
+  try {
+    const { podType } = req.params;
+    
+    if (!['comfyui', 'dreamgen'].includes(podType)) {
+      return res.status(400).json({ error: 'Invalid pod type. Use "comfyui" or "dreamgen"' });
+    }
+    
+    const options = {
+      secretOverrides: req.body?.secretOverrides || {},
+      maxRecreateAttempts: req.body?.maxRecreateAttempts || 2,
+      waitForRunning: req.body?.waitForRunning || false,
+    };
+    
+    const result = await dreams.ensurePod(podType, options);
+    res.json(result);
+  } catch (error) {
+    console.error('Ensure pod error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/dreams/lifecycle/create/:podType
+ * Create a new pod from template (force creation, no discovery)
+ */
+router.post('/lifecycle/create/:podType', async (req, res) => {
+  try {
+    const { podType } = req.params;
+    
+    if (!['comfyui', 'dreamgen'].includes(podType)) {
+      return res.status(400).json({ error: 'Invalid pod type. Use "comfyui" or "dreamgen"' });
+    }
+    
+    const secretOverrides = req.body?.secretOverrides || {};
+    const result = await dreams.createPodFromTemplate(podType, secretOverrides);
+    res.json({ success: true, pod: result });
+  } catch (error) {
+    console.error('Create pod error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================================================
+// SECRETS ENDPOINT (for pods to retrieve credentials)
+// ============================================================================
+
+/**
+ * GET /api/dreams/secrets/:podType
+ * Get secrets for a pod type (used by pods during startup)
+ * 
+ * Query params:
+ *   - token: Bootstrap token for authentication
+ * 
+ * NOTE: This endpoint is protected by a bootstrap token.
+ * The token should be passed to pods via a minimal env var,
+ * and they use it to retrieve full secrets from the admin server.
+ */
+router.get('/secrets/:podType', async (req, res) => {
+  try {
+    const { podType } = req.params;
+    const token = req.query.token || req.headers['x-bootstrap-token'];
+    
+    if (!['comfyui', 'dreamgen'].includes(podType)) {
+      return res.status(400).json({ error: 'Invalid pod type' });
+    }
+    
+    const secrets = dreams.getPodSecrets(podType, token);
+    
+    if (secrets === null) {
+      // Invalid or missing token
+      return res.status(401).json({ error: 'Unauthorized - invalid or missing bootstrap token' });
+    }
+    
+    res.json(secrets);
+  } catch (error) {
+    console.error('Get secrets error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/dreams/secrets/status
+ * Get secret configuration status (no actual secrets)
+ * Useful for checking if secrets are properly configured
+ */
+router.get('/secrets-status', async (req, res) => {
+  try {
+    const status = dreams.getSecretConfigStatus();
+    res.json(status);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================================================
 // EXPORTS
 // ============================================================================
 

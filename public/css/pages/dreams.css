@@ -423,6 +423,85 @@
 }
 
 /* ==========================================================================
+   Lifecycle Management Section
+   ========================================================================== */
+
+.lifecycle-section {
+  border-top: 1px dashed var(--border-subtle);
+  padding-top: var(--space-md);
+  margin-top: var(--space-lg);
+}
+
+.lifecycle-mode-badge {
+  font-family: var(--font-mono);
+  color: var(--accent-primary);
+}
+
+.lifecycle-discovery {
+  margin-bottom: var(--space-md);
+}
+
+.discovery-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.discovery-label {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.discovery-value {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+.lifecycle-templates summary {
+  user-select: none;
+}
+
+.lifecycle-templates[open] summary {
+  margin-bottom: var(--space-sm);
+}
+
+.template-card {
+  padding: var(--space-sm);
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: var(--radius-sm);
+}
+
+.template-card div {
+  margin-bottom: 2px;
+}
+
+.lifecycle-danger summary {
+  user-select: none;
+}
+
+.lifecycle-danger[open] summary {
+  color: var(--text-primary);
+  margin-bottom: 0;
+}
+
+.btn-danger {
+  background: transparent;
+  color: var(--error);
+  border: 1px solid var(--error);
+  padding: var(--space-xs) var(--space-sm);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-danger:hover {
+  background: var(--error);
+  color: var(--bg-primary);
+}
+
+/* ==========================================================================
    Responsive
    ========================================================================== */
 
@@ -458,5 +537,9 @@
   .dreams-quick-links {
     flex-direction: column;
     gap: var(--space-sm);
+  }
+  
+  .lifecycle-discovery > div {
+    grid-template-columns: 1fr;
   }
 }
