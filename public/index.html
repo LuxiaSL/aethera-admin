@@ -542,6 +542,15 @@
             </button>
           </div>
           
+          <!-- Error Display -->
+          <div id="podsErrorDisplay" class="pods-error-display" style="display: none; margin-bottom: var(--space-md);">
+            <div class="error-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-sm);">
+              <span style="color: var(--error); font-weight: 600;">⚠️ Last Error</span>
+              <button class="btn btn-sm" onclick="clearPodErrors()" style="font-size: var(--text-xs);">Clear</button>
+            </div>
+            <div id="podsErrorContent" class="error-content" style="background: var(--bg-tertiary); padding: var(--space-sm); border-radius: var(--radius-sm); font-family: monospace; font-size: var(--text-sm); color: var(--error); white-space: pre-wrap;"></div>
+          </div>
+          
           <!-- Update Section -->
           <div class="runpod-info">
             <div class="runpod-info-title">

@@ -519,6 +519,101 @@ router.post('/pods/dreamgen/update', async (req, res) => {
   }
 });
 
+// ============================================================================
+// POD TERMINATE ENDPOINTS (Delete pods entirely - use with caution!)
+// ============================================================================
+
+/**
+ * DELETE /api/dreams/pods/comfyui
+ * Terminate (delete) the ComfyUI pod entirely
+ * WARNING: This deletes the pod - you'll need to recreate it!
+ */
+router.delete('/pods/comfyui', async (req, res) => {
+  try {
+    const config = require('../config');
+    if (!config.RUNPOD_COMFYUI_POD_ID) {
+      return res.status(400).json({ error: 'RUNPOD_COMFYUI_POD_ID not configured' });
+    }
+    
+    const result = await dreams.terminatePod(config.RUNPOD_COMFYUI_POD_ID);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * DELETE /api/dreams/pods/dreamgen
+ * Terminate (delete) the DreamGen pod entirely
+ * WARNING: This deletes the pod - you'll need to recreate it!
+ */
+router.delete('/pods/dreamgen', async (req, res) => {
+  try {
+    const config = require('../config');
+    if (!config.RUNPOD_DREAMGEN_POD_ID) {
+      return res.status(400).json({ error: 'RUNPOD_DREAMGEN_POD_ID not configured' });
+    }
+    
+    const result = await dreams.terminatePod(config.RUNPOD_DREAMGEN_POD_ID);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================================================
+// ERROR MANAGEMENT ENDPOINTS
+// ============================================================================
+
+/**
+ * GET /api/dreams/errors
+ * Get current error states for all pods
+ */
+router.get('/errors', async (req, res) => {
+  try {
+    const errors = dreams.getErrors();
+    res.json(errors);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * DELETE /api/dreams/errors/:pod
+ * Clear error for a specific pod
+ */
+router.delete('/errors/:pod', async (req, res) => {
+  try {
+    const { pod } = req.params;
+    if (!['comfyui', 'dreamgen', 'general'].includes(pod)) {
+      return res.status(400).json({ error: 'Invalid pod name' });
+    }
+    dreams.clearError(pod);
+    res.json({ success: true, cleared: pod });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * DELETE /api/dreams/errors
+ * Clear all errors
+ */
+router.delete('/errors', async (req, res) => {
+  try {
+    dreams.clearError('comfyui');
+    dreams.clearError('dreamgen');
+    dreams.clearError('general');
+    res.json({ success: true, cleared: 'all' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================================================
+// REGISTRY & STATE ENDPOINTS
+// ============================================================================
+
 /**
  * GET /api/dreams/registry
  * Get ComfyUI registry status from Aethera

@@ -2242,8 +2242,53 @@ function renderPodsStatus() {
     aetheraFrameCount.textContent = aethera.generation?.frames_generated || 0;
   }
   
+  // Display errors
+  displayPodErrors(podsStatus.errors);
+  
   // Update action buttons
   updatePodsActionButtons();
+}
+
+/**
+ * Display pod errors in the UI
+ */
+function displayPodErrors(errors) {
+  const errorDisplay = document.getElementById('podsErrorDisplay');
+  const errorContent = document.getElementById('podsErrorContent');
+  
+  if (!errorDisplay || !errorContent) return;
+  
+  // Check if there are any errors
+  const activeErrors = [];
+  if (errors?.comfyui) {
+    activeErrors.push(`[ComfyUI] ${errors.comfyui.message}`);
+  }
+  if (errors?.dreamgen) {
+    activeErrors.push(`[DreamGen] ${errors.dreamgen.message}`);
+  }
+  if (errors?.general) {
+    activeErrors.push(`[General] ${errors.general.message}`);
+  }
+  
+  if (activeErrors.length > 0) {
+    errorContent.textContent = activeErrors.join('\n');
+    errorDisplay.style.display = 'block';
+  } else {
+    errorDisplay.style.display = 'none';
+  }
+}
+
+/**
+ * Clear all pod errors
+ */
+async function clearPodErrors() {
+  try {
+    await api.dreams.clearAllErrors();
+    showToast('Errors cleared', 'success');
+    refreshPodsStatus();
+  } catch (error) {
+    showToast('Failed to clear errors: ' + error.message, 'error');
+  }
 }
 
 /**
@@ -2429,6 +2474,7 @@ window.updateAllPods = updateAllPods;
 window.updateComfyUIPod = updateComfyUIPod;
 window.updateDreamGenPod = updateDreamGenPod;
 window.clearSavedState = clearSavedState;
+window.clearPodErrors = clearPodErrors;
 
 // ============================================================================
 // BLOG MANAGEMENT

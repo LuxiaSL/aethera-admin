@@ -402,6 +402,44 @@ const api = {
     },
     
     /**
+     * Terminate (delete) ComfyUI pod entirely
+     * WARNING: This deletes the pod - you'll need to recreate it!
+     */
+    async terminateComfyUI() {
+      return api.request('/dreams/pods/comfyui', { method: 'DELETE' });
+    },
+    
+    /**
+     * Terminate (delete) DreamGen pod entirely
+     * WARNING: This deletes the pod - you'll need to recreate it!
+     */
+    async terminateDreamGen() {
+      return api.request('/dreams/pods/dreamgen', { method: 'DELETE' });
+    },
+    
+    /**
+     * Get current error states
+     */
+    async getErrors() {
+      return api.request('/dreams/errors');
+    },
+    
+    /**
+     * Clear error for a pod
+     * @param {string} pod - 'comfyui', 'dreamgen', or 'general'
+     */
+    async clearError(pod) {
+      return api.request(`/dreams/errors/${pod}`, { method: 'DELETE' });
+    },
+    
+    /**
+     * Clear all errors
+     */
+    async clearAllErrors() {
+      return api.request('/dreams/errors', { method: 'DELETE' });
+    },
+    
+    /**
      * Get billing info for dream pods
      * @param {string} period - 'day', 'week', 'month'
      */
