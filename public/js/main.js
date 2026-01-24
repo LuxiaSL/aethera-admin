@@ -2236,7 +2236,7 @@ function renderPodsStatus() {
     aetheraGpuActive.className = `gpu-stat-value ${gpuActive ? 'success' : ''}`;
   }
   if (aetheraWsViewers) {
-    aetheraWsViewers.textContent = aethera.viewers?.ws || 0;
+    aetheraWsViewers.textContent = aethera.viewers?.websocket_count || 0;
   }
   if (aetheraFrameCount) {
     aetheraFrameCount.textContent = aethera.generation?.frames_generated || 0;
