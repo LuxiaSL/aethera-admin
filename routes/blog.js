@@ -253,9 +253,20 @@ router.get('/preview-config', async (req, res) => {
       });
     }
     
+    // Determine blog URL based on request origin
+    // If admin is being accessed locally, use local blog URL
+    const host = req.get('host') || '';
+    const isLocal = host.includes('localhost') || host.includes('127.0.0.1');
+    
+    // Local development: use localhost:8000
+    // Production: use configured VPS_BASE_URL or default
+    const blogUrl = isLocal 
+      ? 'http://localhost:8000'
+      : (config.VPS_BASE_URL || 'https://aetherawi.red');
+    
     res.json({
       available: true,
-      blogUrl: config.VPS_BASE_URL || 'https://aetherawi.red',
+      blogUrl,
       token: config.BLOG_PREVIEW_TOKEN,
     });
   } catch (error) {
