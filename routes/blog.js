@@ -5,6 +5,7 @@ const express = require('express');
 const router = express.Router();
 const { requireAuth } = require('../middleware/require-auth');
 const blog = require('../lib/content/blog');
+const config = require('../config');
 
 // All blog routes require authentication
 router.use(requireAuth);
@@ -232,6 +233,33 @@ router.post('/preview', async (req, res) => {
     res.json({ html });
   } catch (error) {
     console.error('Error previewing content:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/blog/preview-config
+ * Get configuration for draft preview iframe
+ * Returns the blog base URL and preview token for constructing preview URLs
+ */
+router.get('/preview-config', async (req, res) => {
+  try {
+    const hasToken = !!config.BLOG_PREVIEW_TOKEN;
+    
+    if (!hasToken) {
+      return res.json({
+        available: false,
+        error: 'BLOG_PREVIEW_TOKEN not configured',
+      });
+    }
+    
+    res.json({
+      available: true,
+      blogUrl: config.VPS_BASE_URL || 'https://aetherawi.red',
+      token: config.BLOG_PREVIEW_TOKEN,
+    });
+  } catch (error) {
+    console.error('Error getting preview config:', error);
     res.status(500).json({ error: error.message });
   }
 });

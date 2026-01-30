@@ -611,6 +611,14 @@ const api = {
     async status() {
       return api.request('/blog/status');
     },
+    
+    /**
+     * Get preview configuration for draft preview iframe
+     * Returns { available, blogUrl, token } if configured
+     */
+    async previewConfig() {
+      return api.request('/blog/preview-config');
+    },
   },
   
   // ============================================================================

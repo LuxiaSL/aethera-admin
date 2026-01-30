@@ -129,6 +129,14 @@ const VPS_REGISTER_URL = process.env.VPS_REGISTER_URL || `${VPS_BASE_URL}/api/dr
 const POD_BOOTSTRAP_TOKEN = process.env.POD_BOOTSTRAP_TOKEN || '';
 
 // ============================================================================
+// BLOG PREVIEW
+// ============================================================================
+
+// Token for previewing draft posts via iframe
+// Must match BLOG_PREVIEW_TOKEN in core's environment
+const BLOG_PREVIEW_TOKEN = process.env.BLOG_PREVIEW_TOKEN || '';
+
+// ============================================================================
 // SERVER
 // ============================================================================
 
@@ -207,6 +215,9 @@ module.exports = {
   VPS_WEBSOCKET_URL,
   VPS_REGISTER_URL,
   POD_BOOTSTRAP_TOKEN,
+  
+  // Blog preview
+  BLOG_PREVIEW_TOKEN,
   
   // Server
   PORT,

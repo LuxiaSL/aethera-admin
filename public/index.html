@@ -874,9 +874,31 @@
             </div>
           </div>
           <div class="editor-footer-right">
+            <button class="btn-ghost" id="previewPostBtn" onclick="openLivePreview()" title="Preview on site">👁️ Preview</button>
             <button class="btn-secondary" onclick="closePostEditor()">Cancel</button>
             <button class="btn-primary" id="savePostBtn" onclick="savePost()">Save Post</button>
           </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Live Preview Modal (fullscreen iframe) -->
+    <div id="livePreviewModal" class="modal-overlay live-preview-modal" onclick="closeLivePreview(event)">
+      <div class="live-preview-container" onclick="event.stopPropagation()">
+        <div class="live-preview-header">
+          <div class="live-preview-title">
+            <span class="live-preview-icon">👁️</span>
+            <span>Live Preview</span>
+            <span id="livePreviewSlug" class="live-preview-slug"></span>
+          </div>
+          <div class="live-preview-actions">
+            <span id="livePreviewStatus" class="live-preview-status"></span>
+            <button class="btn-ghost" onclick="refreshLivePreview()" title="Refresh">🔄</button>
+            <button class="live-preview-close" onclick="closeLivePreview()">&times;</button>
+          </div>
+        </div>
+        <div class="live-preview-body">
+          <iframe id="livePreviewFrame" src="about:blank" frameborder="0"></iframe>
         </div>
       </div>
     </div>

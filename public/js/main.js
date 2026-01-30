@@ -2868,6 +2868,8 @@ function renderPostsTable() {
       <td>
         <div class="post-actions">
           <button class="btn-icon" onclick="editPost(${post.id})" title="Edit">✏️</button>
+          <button class="btn-icon" onclick="previewPostFromList(${post.id}, '${escapeHtml(post.slug)}', ${post.published})" 
+                  title="Preview">👁️</button>
           <button class="btn-icon" onclick="${post.published ? 'unpublishPost' : 'publishPost'}(${post.id})" 
                   title="${post.published ? 'Unpublish' : 'Publish'}">
             ${post.published ? '📤' : '📥'}
@@ -3109,6 +3111,195 @@ function closeDeleteModal(event) {
   deletePostId = null;
 }
 
+// ============================================================================
+// LIVE PREVIEW (Draft Preview in iframe)
+// ============================================================================
+
+let livePreviewConfig = null;
+let currentPreviewSlug = null;
+
+/**
+ * Open the live preview modal with the current post
+ * First saves the post as a draft if needed, then opens preview
+ */
+async function openLivePreview() {
+  const title = document.getElementById('postTitleInput').value.trim();
+  const content = document.getElementById('postContentEditor').value;
+  
+  if (!title) {
+    showToast('Enter a title before previewing', 'error');
+    document.getElementById('postTitleInput').focus();
+    return;
+  }
+  
+  if (!content.trim()) {
+    showToast('Enter content before previewing', 'error');
+    document.getElementById('postContentEditor').focus();
+    return;
+  }
+  
+  // Get preview config (cached or fresh)
+  if (!livePreviewConfig) {
+    try {
+      livePreviewConfig = await api.blog.previewConfig();
+    } catch (error) {
+      showToast('Failed to get preview configuration', 'error');
+      return;
+    }
+  }
+  
+  if (!livePreviewConfig.available) {
+    showPreviewUnavailable(livePreviewConfig.error || 'Preview not configured');
+    return;
+  }
+  
+  // Save as draft first if this is a new post or content changed
+  try {
+    const postData = {
+      title,
+      content,
+      author: document.getElementById('postAuthorInput').value.trim() || 'luxia',
+      tags: document.getElementById('postTagsInput').value.trim() || null,
+      categories: document.getElementById('postCategoriesInput').value.trim() || null,
+      license: document.getElementById('postLicenseInput').value,
+      published: editorPublishState,
+    };
+    
+    let slug;
+    if (currentEditingPostId) {
+      // Update existing post
+      const result = await api.blog.update(currentEditingPostId, postData);
+      slug = result.post.slug;
+      showToast('Post saved', 'info');
+    } else {
+      // Create new post as draft
+      const result = await api.blog.create(postData);
+      currentEditingPostId = result.post.id;
+      slug = result.post.slug;
+      showToast('Draft saved', 'info');
+    }
+    
+    // Now open preview
+    currentPreviewSlug = slug;
+    const previewUrl = `${livePreviewConfig.blogUrl}/preview/${slug}?token=${livePreviewConfig.token}`;
+    
+    // Update modal UI
+    document.getElementById('livePreviewSlug').textContent = `/${slug}`;
+    const statusEl = document.getElementById('livePreviewStatus');
+    statusEl.textContent = editorPublishState ? 'Published' : 'Draft';
+    statusEl.className = `live-preview-status ${editorPublishState ? 'published' : 'draft'}`;
+    
+    // Load iframe
+    const frame = document.getElementById('livePreviewFrame');
+    const previewBody = frame.parentElement;
+    previewBody.classList.add('loading');
+    
+    frame.onload = () => {
+      previewBody.classList.remove('loading');
+    };
+    
+    frame.src = previewUrl;
+    
+    // Show modal
+    document.getElementById('livePreviewModal').classList.add('active');
+    
+  } catch (error) {
+    showToast(error.message || 'Failed to save post for preview', 'error');
+  }
+}
+
+/**
+ * Refresh the live preview iframe
+ */
+function refreshLivePreview() {
+  if (!currentPreviewSlug || !livePreviewConfig?.available) return;
+  
+  const frame = document.getElementById('livePreviewFrame');
+  const previewBody = frame.parentElement;
+  previewBody.classList.add('loading');
+  
+  // Reload with cache bust
+  const previewUrl = `${livePreviewConfig.blogUrl}/preview/${currentPreviewSlug}?token=${livePreviewConfig.token}&_t=${Date.now()}`;
+  frame.src = previewUrl;
+}
+
+/**
+ * Close the live preview modal
+ */
+function closeLivePreview(event) {
+  if (event && event.target !== event.currentTarget) return;
+  document.getElementById('livePreviewModal').classList.remove('active');
+  document.getElementById('livePreviewFrame').src = 'about:blank';
+  currentPreviewSlug = null;
+}
+
+/**
+ * Show preview unavailable state
+ */
+function showPreviewUnavailable(reason) {
+  const previewBody = document.querySelector('.live-preview-body');
+  previewBody.innerHTML = `
+    <div class="live-preview-unavailable">
+      <div class="live-preview-unavailable-icon">🔒</div>
+      <h3 class="live-preview-unavailable-title">Preview Not Available</h3>
+      <p class="live-preview-unavailable-text">
+        ${reason}<br><br>
+        To enable preview, set the <code>BLOG_PREVIEW_TOKEN</code> environment variable 
+        in both the admin panel and the blog (core) service.
+      </p>
+    </div>
+  `;
+  document.getElementById('livePreviewModal').classList.add('active');
+}
+
+/**
+ * Preview a post directly from the list (without opening editor)
+ */
+async function previewPostFromList(id, slug, isPublished) {
+  // Get preview config (cached or fresh)
+  if (!livePreviewConfig) {
+    try {
+      livePreviewConfig = await api.blog.previewConfig();
+    } catch (error) {
+      showToast('Failed to get preview configuration', 'error');
+      return;
+    }
+  }
+  
+  if (!livePreviewConfig.available) {
+    showPreviewUnavailable(livePreviewConfig.error || 'Preview not configured');
+    return;
+  }
+  
+  currentPreviewSlug = slug;
+  const previewUrl = `${livePreviewConfig.blogUrl}/preview/${slug}?token=${livePreviewConfig.token}`;
+  
+  // Update modal UI
+  document.getElementById('livePreviewSlug').textContent = `/${slug}`;
+  const statusEl = document.getElementById('livePreviewStatus');
+  statusEl.textContent = isPublished ? 'Published' : 'Draft';
+  statusEl.className = `live-preview-status ${isPublished ? 'published' : 'draft'}`;
+  
+  // Ensure we have a proper iframe in the body (reset from error state)
+  const previewBody = document.querySelector('.live-preview-body');
+  if (!previewBody.querySelector('iframe')) {
+    previewBody.innerHTML = '<iframe id="livePreviewFrame" src="about:blank" frameborder="0"></iframe>';
+  }
+  
+  // Load iframe
+  const frame = document.getElementById('livePreviewFrame');
+  previewBody.classList.add('loading');
+  
+  frame.onload = () => {
+    previewBody.classList.remove('loading');
+  };
+  
+  frame.src = previewUrl;
+  
+  // Show modal
+  document.getElementById('livePreviewModal').classList.add('active');
+}
+
 // Make blog functions global
 window.loadBlog = loadBlog;
 window.refreshBlogPosts = refreshBlogPosts;
@@ -3126,6 +3317,10 @@ window.viewPostOnSite = viewPostOnSite;
 window.confirmDeletePost = confirmDeletePost;
 window.confirmDeletePostAction = confirmDeletePostAction;
 window.closeDeleteModal = closeDeleteModal;
+window.openLivePreview = openLivePreview;
+window.refreshLivePreview = refreshLivePreview;
+window.closeLivePreview = closeLivePreview;
+window.previewPostFromList = previewPostFromList;
 
 async function loadIRC() {
   // TODO: Implement in Phase 6
