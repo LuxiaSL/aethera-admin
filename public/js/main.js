@@ -797,6 +797,7 @@ document.addEventListener('keydown', (e) => {
     closeLogsModal();
     closeConfigModal();
     closeAetheraLogsModal();
+    closeMembraneApiLogsModal();
     // Blog modals
     if (typeof closePostEditor === 'function') closePostEditor();
     if (typeof closeDeleteModal === 'function') closeDeleteModal();
@@ -1119,6 +1120,7 @@ window.formatDuration = formatDuration;
 // ============================================================================
 
 let aetheraStatus = null;
+let membraneApiStatus = null;
 
 async function loadServices() {
   // Use live data stream
@@ -1134,9 +1136,11 @@ function loadServicesLive() {
   
   streams.connect('services', (data) => {
     aetheraStatus = data.aethera || null;
+    membraneApiStatus = data.membraneApi || null;
     currentSlots = data.slots || {};
     
     renderAetheraStatus();
+    renderMembraneApiStatus();
     renderSlots();
     
     // Re-apply cached deps UI after renderSlots rebuilds the DOM
@@ -1304,6 +1308,152 @@ function scrollAetheraLogsToBottom() {
 function closeAetheraLogsModal(event) {
   if (event && event.target !== event.currentTarget) return;
   document.getElementById('aetheraLogsModal').classList.remove('active');
+}
+
+// ============================================================================
+// MEMBRANE-API MANAGEMENT
+// ============================================================================
+
+async function refreshMembraneApiStatus() {
+  try {
+    membraneApiStatus = await api.services.membraneApiStatus();
+    renderMembraneApiStatus();
+  } catch (error) {
+    console.error('Error loading membrane-api status:', error);
+    showToast('Failed to load membrane-api status', 'error');
+  }
+}
+
+function renderMembraneApiStatus() {
+  if (!membraneApiStatus) return;
+  
+  // Status badge
+  const statusBadge = document.getElementById('membraneApiStatusBadge');
+  if (statusBadge) {
+    const running = membraneApiStatus.running;
+    const statusText = membraneApiStatus.available === false ? 'Not Found' : 
+                       running ? 'Running' : 'Stopped';
+    statusBadge.className = `service-status-badge ${running ? 'running' : 'stopped'}`;
+    statusBadge.innerHTML = `<span class="status-dot ${running ? 'running' : 'stopped'}"></span> ${statusText}`;
+  }
+  
+  // Health badge
+  const healthBadge = document.getElementById('membraneApiHealthBadge');
+  if (healthBadge) {
+    const health = membraneApiStatus.health;
+    healthBadge.className = `service-health-badge ${health}`;
+    healthBadge.textContent = health === 'healthy' ? '✓ Healthy' : health === 'unhealthy' ? '✗ Unhealthy' : '—';
+  }
+  
+  // Stats
+  const serviceEl = document.getElementById('membraneApiService');
+  const pidEl = document.getElementById('membraneApiPid');
+  const uptimeEl = document.getElementById('membraneApiUptime');
+  const memoryEl = document.getElementById('membraneApiMemory');
+  
+  if (serviceEl) serviceEl.textContent = membraneApiStatus.serviceName || '—';
+  if (pidEl) pidEl.textContent = membraneApiStatus.pid || '—';
+  if (uptimeEl) uptimeEl.textContent = membraneApiStatus.uptime ? formatUptime(membraneApiStatus.uptime) : '—';
+  if (memoryEl) memoryEl.textContent = membraneApiStatus.memoryMb ? `${membraneApiStatus.memoryMb} MB` : '—';
+  
+  // Providers display
+  const providersContainer = document.getElementById('membraneApiProviders');
+  const providersList = document.getElementById('membraneApiProvidersList');
+  if (providersContainer && providersList && membraneApiStatus.healthDetails?.providers) {
+    const providers = membraneApiStatus.healthDetails.providers;
+    const providerNames = Object.keys(providers).filter(p => providers[p] === 'ready');
+    
+    if (providerNames.length > 0) {
+      providersContainer.style.display = 'flex';
+      providersList.innerHTML = providerNames.map(p => 
+        `<span class="provider-badge">${escapeHtml(p)}</span>`
+      ).join('');
+    } else {
+      providersContainer.style.display = 'none';
+    }
+  }
+  
+  // Action buttons
+  const startBtn = document.getElementById('membraneApiStartBtn');
+  const stopBtn = document.getElementById('membraneApiStopBtn');
+  const restartBtn = document.getElementById('membraneApiRestartBtn');
+  
+  if (membraneApiStatus.available) {
+    if (membraneApiStatus.running) {
+      startBtn.style.display = 'none';
+      stopBtn.style.display = 'inline-flex';
+      restartBtn.disabled = false;
+    } else {
+      startBtn.style.display = 'inline-flex';
+      stopBtn.style.display = 'none';
+      restartBtn.disabled = true;
+    }
+  } else {
+    startBtn.style.display = 'none';
+    stopBtn.style.display = 'none';
+    restartBtn.disabled = true;
+  }
+}
+
+async function startMembraneApi() {
+  try {
+    showToast('Starting membrane-api...', 'info');
+    await api.services.membraneApiStart();
+    showToast('membrane-api started', 'success');
+    await refreshMembraneApiStatus();
+  } catch (error) {
+    showToast(error.message || 'Failed to start membrane-api', 'error');
+  }
+}
+
+async function stopMembraneApi() {
+  if (!confirm('Stop membrane-api? LLM services will be unavailable.')) return;
+  
+  try {
+    showToast('Stopping membrane-api...', 'info');
+    await api.services.membraneApiStop();
+    showToast('membrane-api stopped', 'success');
+    await refreshMembraneApiStatus();
+  } catch (error) {
+    showToast(error.message || 'Failed to stop membrane-api', 'error');
+  }
+}
+
+async function restartMembraneApi() {
+  try {
+    showToast('Restarting membrane-api...', 'info');
+    await api.services.membraneApiRestart();
+    showToast('membrane-api restarted', 'success');
+    await refreshMembraneApiStatus();
+  } catch (error) {
+    showToast(error.message || 'Failed to restart membrane-api', 'error');
+  }
+}
+
+async function viewMembraneApiLogs() {
+  document.getElementById('membraneApiLogsOutput').textContent = '[Loading...]';
+  document.getElementById('membraneApiLogsModal').classList.add('active');
+  await refreshMembraneApiLogs();
+}
+
+async function refreshMembraneApiLogs() {
+  try {
+    const data = await api.services.membraneApiLogs(300);
+    document.getElementById('membraneApiLogsOutput').textContent = data.logs || '[No logs available]';
+    scrollMembraneApiLogsToBottom();
+  } catch (error) {
+    document.getElementById('membraneApiLogsOutput').textContent = `[Error: ${error.message}]`;
+  }
+}
+
+function scrollMembraneApiLogsToBottom() {
+  const output = document.getElementById('membraneApiLogsOutput');
+  output.scrollTop = output.scrollHeight;
+}
+
+function closeMembraneApiLogsModal(event) {
+  if (event && event.target !== event.currentTarget) return;
+  document.getElementById('membraneApiLogsModal').classList.remove('active');
 }
 
 // ============================================================================
@@ -1854,6 +2004,13 @@ window.viewAetheraLogs = viewAetheraLogs;
 window.refreshAetheraLogs = refreshAetheraLogs;
 window.scrollAetheraLogsToBottom = scrollAetheraLogsToBottom;
 window.closeAetheraLogsModal = closeAetheraLogsModal;
+window.startMembraneApi = startMembraneApi;
+window.stopMembraneApi = stopMembraneApi;
+window.restartMembraneApi = restartMembraneApi;
+window.viewMembraneApiLogs = viewMembraneApiLogs;
+window.refreshMembraneApiLogs = refreshMembraneApiLogs;
+window.scrollMembraneApiLogsToBottom = scrollMembraneApiLogsToBottom;
+window.closeMembraneApiLogsModal = closeMembraneApiLogsModal;
 window.loadSlots = loadSlots;
 window.refreshSlot = refreshSlot;
 window.fetchSlot = fetchSlot;
@@ -3674,6 +3831,16 @@ function renderServiceHealth(services) {
       running: services.aethera.running,
       status: services.aethera.running ? 
         (services.aethera.health === 'healthy' ? 'running' : 'error') : 'stopped',
+    });
+  }
+  
+  // Membrane API (Systemd)
+  if (services.membraneApi) {
+    items.push({
+      name: 'membrane-api',
+      running: services.membraneApi.running,
+      status: services.membraneApi.running ? 
+        (services.membraneApi.health === 'healthy' ? 'running' : 'error') : 'stopped',
     });
   }
   

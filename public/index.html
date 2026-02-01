@@ -332,7 +332,7 @@
     <div id="page-services" class="page-content">
       <div class="page-header">
         <h1 class="page-title">Services</h1>
-        <p class="page-subtitle">Manage æthera and ChapterX deployment slots</p>
+        <p class="page-subtitle">Manage æthera, membrane-api, and ChapterX deployment slots</p>
       </div>
       
       <!-- Docker Warning (if unavailable) -->
@@ -391,6 +391,60 @@
         </div>
       </div>
       
+      <!-- Membrane API Section -->
+      <div class="services-section">
+        <h2 class="services-section-title">🧠 membrane-api (LLM Middleware)</h2>
+        <div id="membraneApiCard" class="service-card">
+          <div class="service-card-header">
+            <div class="service-card-info">
+              <div class="service-card-name">
+                membrane-api
+                <span class="service-card-type">Systemd</span>
+              </div>
+              <div class="service-card-description">LLM middleware service for unified AI model access (BYOK)</div>
+            </div>
+            <div class="service-card-status">
+              <span id="membraneApiStatusBadge" class="service-status-badge stopped">
+                <span class="status-dot stopped"></span>
+                Loading...
+              </span>
+              <span id="membraneApiHealthBadge" class="service-health-badge">—</span>
+            </div>
+          </div>
+          
+          <div id="membraneApiStats" class="service-stats">
+            <div class="service-stat">
+              <span class="service-stat-label">Service</span>
+              <span class="service-stat-value" id="membraneApiService">—</span>
+            </div>
+            <div class="service-stat">
+              <span class="service-stat-label">PID</span>
+              <span class="service-stat-value" id="membraneApiPid">—</span>
+            </div>
+            <div class="service-stat">
+              <span class="service-stat-label">Uptime</span>
+              <span class="service-stat-value" id="membraneApiUptime">—</span>
+            </div>
+            <div class="service-stat">
+              <span class="service-stat-label">Memory</span>
+              <span class="service-stat-value" id="membraneApiMemory">—</span>
+            </div>
+          </div>
+          
+          <div id="membraneApiProviders" class="service-providers" style="display: none;">
+            <span class="service-stat-label">Providers</span>
+            <div id="membraneApiProvidersList" class="provider-badges"></div>
+          </div>
+          
+          <div class="service-actions">
+            <button id="membraneApiStartBtn" class="btn-primary" onclick="startMembraneApi()" style="display: none;">▶️ Start</button>
+            <button id="membraneApiStopBtn" class="btn-secondary" onclick="stopMembraneApi()" style="display: none;">⏹️ Stop</button>
+            <button id="membraneApiRestartBtn" class="btn-secondary" onclick="restartMembraneApi()">🔄 Restart</button>
+            <button class="btn-secondary" onclick="viewMembraneApiLogs()">📜 View Logs</button>
+          </div>
+        </div>
+      </div>
+      
       <!-- ChapterX Slots Section -->
       <div class="services-section">
         <h2 class="services-section-title">📦 ChapterX Deployment Slots</h2>
@@ -420,6 +474,23 @@
             <button class="btn-ghost" onclick="scrollAetheraLogsToBottom()">⬇️ Scroll to bottom</button>
           </div>
           <pre id="aetheraLogsOutput" class="logs-output">[Loading...]</pre>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Membrane API Logs Modal -->
+    <div id="membraneApiLogsModal" class="modal-overlay logs-modal" onclick="closeMembraneApiLogsModal(event)">
+      <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-header">
+          <span class="modal-title">membrane-api Logs</span>
+          <button class="modal-close" onclick="closeMembraneApiLogsModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="logs-controls">
+            <button class="btn-secondary" onclick="refreshMembraneApiLogs()">🔄 Refresh</button>
+            <button class="btn-ghost" onclick="scrollMembraneApiLogsToBottom()">⬇️ Scroll to bottom</button>
+          </div>
+          <pre id="membraneApiLogsOutput" class="logs-output">[Loading...]</pre>
         </div>
       </div>
     </div>

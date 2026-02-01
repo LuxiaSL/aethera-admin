@@ -158,6 +158,7 @@ const api = {
       return api.request('/services');
     },
     
+    // Aethera (Docker)
     async aetheraStatus() {
       return api.request('/services/aethera/status');
     },
@@ -180,6 +181,39 @@ const api = {
     
     async aetheraHealth() {
       return api.request('/services/aethera/health');
+    },
+    
+    // Membrane API (Systemd)
+    async membraneApiStatus() {
+      return api.request('/services/membrane-api/status');
+    },
+    
+    async membraneApiLogs(lines = 200) {
+      return api.request(`/services/membrane-api/logs?lines=${lines}`);
+    },
+    
+    async membraneApiRestart() {
+      return api.request('/services/membrane-api/restart', { method: 'POST' });
+    },
+    
+    async membraneApiStart() {
+      return api.request('/services/membrane-api/start', { method: 'POST' });
+    },
+    
+    async membraneApiStop() {
+      return api.request('/services/membrane-api/stop', { method: 'POST' });
+    },
+    
+    async membraneApiHealth() {
+      return api.request('/services/membrane-api/health');
+    },
+    
+    async membraneApiStats() {
+      return api.request('/services/membrane-api/stats');
+    },
+    
+    async membraneApiModels() {
+      return api.request('/services/membrane-api/models');
     },
   },
   

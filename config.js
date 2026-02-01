@@ -166,6 +166,13 @@ const SLOTS_FILE = path.join(DATA_DIR, 'slots.json');
 const AETHERA_CONTAINER_NAME = process.env.AETHERA_CONTAINER_NAME || 'aethera';
 
 // ============================================================================
+// MEMBRANE-API (LLM middleware service)
+// ============================================================================
+
+const MEMBRANE_API_URL = process.env.MEMBRANE_API_URL || 'http://localhost:3001';
+const MEMBRANE_API_SERVICE_NAME = process.env.MEMBRANE_API_SERVICE_NAME || 'membrane-api';
+
+// ============================================================================
 // RATE LIMITING
 // ============================================================================
 
@@ -235,6 +242,10 @@ module.exports = {
   
   // Docker
   AETHERA_CONTAINER_NAME,
+  
+  // Membrane API
+  MEMBRANE_API_URL,
+  MEMBRANE_API_SERVICE_NAME,
   
   // Rate limiting
   RATE_LIMIT_WINDOW,

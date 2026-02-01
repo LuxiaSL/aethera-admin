@@ -465,6 +465,37 @@
 }
 
 /* ==========================================================================
+   Provider Badges (for membrane-api)
+   ========================================================================== */
+
+.service-providers {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-subtle);
+  margin-bottom: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.provider-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+.provider-badge {
+  font-size: var(--text-xs);
+  padding: 2px 8px;
+  background: rgba(74, 222, 128, 0.1);
+  border: 1px solid rgba(74, 222, 128, 0.3);
+  color: var(--status-success);
+  font-family: var(--font-mono);
+  text-transform: lowercase;
+}
+
+/* ==========================================================================
    Docker Status Indicator
    ========================================================================== */
 
