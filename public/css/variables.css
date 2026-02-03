@@ -12,10 +12,11 @@
 
 :root {
   /* Color Palette - Pure void with high contrast */
-  --bg-primary: #000000;
-  --bg-secondary: #050508;
-  --bg-tertiary: #0a0a0f;
-  --bg-elevated: #0f0f14;
+  /* Semi-transparent to let shader show through */
+  --bg-primary: transparent;
+  --bg-secondary: rgba(5, 5, 8, 0.85);
+  --bg-tertiary: rgba(10, 10, 15, 0.9);
+  --bg-elevated: rgba(15, 15, 20, 0.92);
   
   /* Text - High contrast */
   --text-primary: #ffffff;
