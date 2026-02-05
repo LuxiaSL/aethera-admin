@@ -1,0 +1,176 @@
+/* crt-overlay.css - CRT post-processing effects for entire page
+ * Toggle with body.crt-overlay class
+ * A/B test: enable/disable via window.crtOverlay.toggle()
+ */
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SCANLINE OVERLAY
+   Horizontal lines across entire viewport
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+body.crt-overlay::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 9998;
+  
+  /* Scanline pattern - subtle horizontal lines */
+  background: repeating-linear-gradient(
+    0deg,
+    transparent 0px,
+    transparent 2px,
+    rgba(0, 0, 0, 0.15) 2px,
+    rgba(0, 0, 0, 0.15) 4px
+  );
+  
+  /* Subtle animation - scanlines drift slowly */
+  animation: scanline-drift 8s linear infinite;
+}
+
+@keyframes scanline-drift {
+  0% { background-position: 0 0; }
+  100% { background-position: 0 4px; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   VIGNETTE OVERLAY
+   Darkened edges framing the viewport
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+body.crt-overlay::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 9997;
+  
+  /* Radial vignette - darker at edges */
+  background: radial-gradient(
+    ellipse at center,
+    transparent 0%,
+    transparent 50%,
+    rgba(0, 0, 0, 0.15) 80%,
+    rgba(0, 0, 0, 0.4) 100%
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CONTENT FILTER
+   Color grading applied to all content
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+body.crt-overlay #mainApp,
+body.crt-overlay #loginScreen {
+  /* Subtle CRT color treatment */
+  filter: 
+    contrast(1.05)
+    saturate(1.1)
+    brightness(0.98);
+  
+  /* Slight blur on edges via box-shadow trick - creates soft glow */
+}
+
+/* Text gets subtle text-shadow for that phosphor glow */
+body.crt-overlay h1,
+body.crt-overlay h2,
+body.crt-overlay h3,
+body.crt-overlay .page-title,
+body.crt-overlay .login-title,
+body.crt-overlay .stat-value,
+body.crt-overlay .nav-tab.active {
+  text-shadow: 
+    0 0 2px currentColor,
+    0 0 8px rgba(255, 255, 255, 0.1);
+}
+
+/* Interactive elements get enhanced glow on hover */
+body.crt-overlay button:hover:not(:disabled),
+body.crt-overlay .nav-tab:hover {
+  text-shadow: 
+    0 0 4px currentColor,
+    0 0 12px rgba(255, 255, 255, 0.2);
+}
+
+/* Cards get subtle edge glow */
+body.crt-overlay .card,
+body.crt-overlay .login-box,
+body.crt-overlay .bot-card,
+body.crt-overlay .service-card {
+  box-shadow: 
+    var(--glow-subtle),
+    inset 0 0 30px rgba(255, 255, 255, 0.01);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FLICKER EFFECT (optional - more intense)
+   Uncomment body.crt-overlay.flicker to enable
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+body.crt-overlay.crt-flicker #mainApp,
+body.crt-overlay.crt-flicker #loginScreen {
+  animation: crt-flicker 0.1s infinite;
+}
+
+@keyframes crt-flicker {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.995; }
+  25%, 75% { opacity: 0.998; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CHROMATIC FRINGE (optional - text only)
+   Adds subtle RGB split on headings
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+body.crt-overlay.crt-chroma h1,
+body.crt-overlay.crt-chroma .page-title,
+body.crt-overlay.crt-chroma .login-title {
+  text-shadow: 
+    -1px 0 rgba(255, 0, 0, 0.15),
+    1px 0 rgba(0, 255, 255, 0.15),
+    0 0 4px currentColor;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   INTERLACE EFFECT (optional)
+   More aggressive scanlines for that authentic CRT feel
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+body.crt-overlay.crt-interlace::before {
+  background: repeating-linear-gradient(
+    0deg,
+    transparent 0px,
+    transparent 1px,
+    rgba(0, 0, 0, 0.2) 1px,
+    rgba(0, 0, 0, 0.2) 2px
+  );
+  animation: interlace-flicker 0.05s steps(2) infinite;
+}
+
+@keyframes interlace-flicker {
+  0% { background-position: 0 0; }
+  100% { background-position: 0 2px; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CURVATURE SIMULATION (optional)
+   Slight barrel distortion feel via perspective
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+body.crt-overlay.crt-curve {
+  perspective: 1000px;
+}
+
+body.crt-overlay.crt-curve #mainApp,
+body.crt-overlay.crt-curve #loginScreen {
+  transform: rotateX(0.5deg);
+  transform-origin: center center;
+}
+
