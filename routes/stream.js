@@ -19,7 +19,6 @@ const DOMAIN_CONFIG = {
   dashboard: { interval: 5000, aggregator: 'getDashboardData' },
   bots:      { interval: 5000, aggregator: 'getBotsData' },
   services:  { interval: 5000, aggregator: 'getServicesData' },
-  dreams:    { interval: 5000, aggregator: 'getDreamsData' },
   server:    { interval: 3000, aggregator: 'getServerData' },
   blog:      { interval: 30000, aggregator: 'getBlogData' },
   usage:     { interval: 10000, aggregator: 'getUsageData' },  // Sync + update every 10s
