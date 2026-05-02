@@ -15,6 +15,7 @@
   <link rel="stylesheet" href="/css/pages/login.css">
   <link rel="stylesheet" href="/css/pages/bots.css">
   <link rel="stylesheet" href="/css/pages/services.css">
+  <link rel="stylesheet" href="/css/pages/dreams.css">
   <link rel="stylesheet" href="/css/pages/blog.css">
   <link rel="stylesheet" href="/css/pages/server.css">
   <link rel="stylesheet" href="/css/pages/usage.css">
@@ -97,6 +98,7 @@
       <button class="nav-tab active" data-page="dashboard">📊 Dashboard</button>
       <button class="nav-tab" data-page="bots">🤖 Bots</button>
       <button class="nav-tab" data-page="services">⚙️ Services</button>
+      <button class="nav-tab" data-page="dreams">🎨 Dreams</button>
       <button class="nav-tab" data-page="blog">📝 Blog</button>
       <button class="nav-tab" data-page="irc">💬 IRC</button>
       <button class="nav-tab" data-page="server">🖥️ Server</button>
@@ -118,6 +120,10 @@
         <div class="stat-card">
           <span class="stat-label">Bots Running</span>
           <span class="stat-value success" id="statBotsRunning">-</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Dream Window</span>
+          <span class="stat-value" id="statDreams">-</span>
         </div>
         <div class="stat-card">
           <span class="stat-label">Today's Cost</span>
@@ -522,6 +528,94 @@
       </div>
     </div>
     
+    <!-- Dreams Page -->
+    <div id="page-dreams" class="page-content">
+      <div class="page-header">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+          <div>
+            <h1 class="page-title">Dream Window</h1>
+            <p class="page-subtitle">Live stream health monitoring</p>
+          </div>
+          <button class="btn-secondary" onclick="forceRefreshDreams()">
+            ⟳ Refresh
+          </button>
+        </div>
+      </div>
+
+      <div class="dreams-status-card">
+        <div class="dreams-status-header">
+          <div class="dreams-status-title">
+            <div>
+              <h3>Stream Status</h3>
+              <span class="subtitle" id="dreamsStatusMessage">Checking...</span>
+            </div>
+          </div>
+          <div id="dreamsGpuBadge" class="dreams-gpu-badge disconnected">
+            <span class="status-dot"></span>
+            <span id="dreamsGpuLabel">Disconnected</span>
+          </div>
+        </div>
+
+        <div class="dreams-stats-grid">
+          <div class="dreams-stat">
+            <div class="dreams-stat-label">FPS</div>
+            <div class="dreams-stat-value" id="dreamsFps">—</div>
+          </div>
+          <div class="dreams-stat">
+            <div class="dreams-stat-label">Frames</div>
+            <div class="dreams-stat-value" id="dreamsFrames">—</div>
+          </div>
+          <div class="dreams-stat">
+            <div class="dreams-stat-label">Keyframe</div>
+            <div class="dreams-stat-value" id="dreamsKeyframe">—</div>
+          </div>
+          <div class="dreams-stat">
+            <div class="dreams-stat-label">Viewers</div>
+            <div class="dreams-stat-value" id="dreamsViewers">—</div>
+          </div>
+          <div class="dreams-stat">
+            <div class="dreams-stat-label">Throughput</div>
+            <div class="dreams-stat-value" id="dreamsThroughput">—</div>
+          </div>
+          <div class="dreams-stat">
+            <div class="dreams-stat-label">Samples</div>
+            <div class="dreams-stat-value muted" id="dreamsSamples">0</div>
+          </div>
+        </div>
+
+        <div id="dreamsPollError" class="dreams-poll-error" style="display: none;"></div>
+      </div>
+
+      <!-- Health Windows -->
+      <div class="dreams-health-section">
+        <div class="dreams-health-title">
+          <span>Health Analysis</span>
+          <span id="dreamsOverallBadge" class="dreams-overall-badge no_data">No Data</span>
+        </div>
+        <div class="dreams-health-grid" id="dreamsHealthGrid">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+      <!-- Preview -->
+      <div class="dreams-preview-section">
+        <div class="dreams-health-title" style="margin-bottom: var(--space-sm);">
+          <span>Live Preview</span>
+        </div>
+        <div class="dreams-preview-container" id="dreamsPreviewContainer">
+          <div class="dreams-preview-offline" id="dreamsPreviewOffline">
+            GPU not connected — no stream available
+          </div>
+        </div>
+      </div>
+
+      <!-- Links -->
+      <div class="dreams-links">
+        <a href="#" class="dreams-link" onclick="openDreamsViewer(event)">Open Viewer</a>
+        <a href="#" class="dreams-link" onclick="openDreamsApi(event)">API Docs</a>
+      </div>
+    </div>
+
     <!-- Blog Page -->
     <div id="page-blog" class="page-content">
       <div class="page-header">

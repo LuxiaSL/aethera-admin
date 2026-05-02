@@ -11,12 +11,14 @@ const config = require('./config');
 const { loadSessions } = require('./lib/auth/sessions');
 const { userExists, createUser } = require('./lib/auth/users');
 const usage = require('./lib/services/usage');
+const dreams = require('./lib/services/dreams');
 
 // Route modules
 const authRoutes = require('./routes/auth');
 const botsRoutes = require('./routes/bots');
 const servicesRoutes = require('./routes/services');
 const slotsRoutes = require('./routes/slots');
+const dreamsRoutes = require('./routes/dreams');
 const blogRoutes = require('./routes/blog');
 const serverRoutes = require('./routes/server');
 const streamRoutes = require('./routes/stream');
@@ -45,6 +47,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/bots', botsRoutes);
 app.use('/api/services', servicesRoutes);
 app.use('/api/slots', slotsRoutes);
+app.use('/api/dreams', dreamsRoutes);
 app.use('/api/blog', blogRoutes);
 app.use('/api/server', serverRoutes);
 app.use('/api/stream', streamRoutes);
@@ -93,6 +96,9 @@ async function startup() {
   // Initialize usage database
   usage.initDB();
   console.log('  ✓ Usage database initialized');
+
+  // Start dreams health monitor
+  dreams.start();
   
   // Check if user exists, if not create default admin
   if (!userExists()) {

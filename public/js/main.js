@@ -242,6 +242,9 @@ function navigateTo(page) {
     case 'services':
       loadServices();
       break;
+    case 'dreams':
+      loadDreams();
+      break;
     case 'blog':
       loadBlog();
       break;
@@ -322,6 +325,17 @@ function renderDashboardData(data) {
     </div>
   `;
   
+  // Dreams section
+  const dreams = data.dreams || {};
+  const dreamsLabel = dreams.gpuConnected
+    ? `${dreams.fps != null ? dreams.fps.toFixed(1) + ' FPS' : 'Active'}`
+    : 'Offline';
+  pulseUpdate('statDreams', dreamsLabel);
+  const dreamsEl = document.getElementById('statDreams');
+  if (dreamsEl) {
+    dreamsEl.className = `stat-value ${dreams.gpuConnected ? 'success' : ''}`;
+  }
+
   // Blog section
   const blog = data.blog || {};
   pulseUpdate('statBlogPosts', blog.total || 0);
@@ -348,9 +362,10 @@ async function forceRefreshDashboard() {
   showToast('Refreshing dashboard...', 'info');
   try {
     // Fetch all data in parallel
-    const [botsData, aetheraData, blogStats, usageData] = await Promise.all([
+    const [botsData, aetheraData, dreamsData, blogStats, usageData] = await Promise.all([
       api.bots.list().catch(() => ({ bots: [], running: 0 })),
       api.services.aetheraStatus().catch(() => ({ running: false })),
+      api.dreams.status().catch(() => ({ gpuConnected: false, status: 'unknown' })),
       api.blog.stats().catch(() => ({ total: 0 })),
       api.usage.summary('day').catch(() => ({ totals: {} })),
     ]);
@@ -373,6 +388,10 @@ async function forceRefreshDashboard() {
           running: aetheraData.running || false,
           health: aetheraData.health || '',
         },
+      },
+      dreams: {
+        gpuConnected: dreamsData.gpuConnected || false,
+        fps: dreamsData.generation?.fps ?? null,
       },
       blog: {
         total: blogStats.total || 0,
@@ -2006,6 +2025,200 @@ window.discardSlotChanges = discardSlotChanges;
 window.copyDiffToClipboard = copyDiffToClipboard;
 window.loadSlotDeps = loadSlotDeps;
 window.updateSlotDeps = updateSlotDeps;
+
+// ============================================================================
+// DREAMS MONITORING
+// ============================================================================
+
+function loadDreams() {
+  streams.connect('dreams', renderDreamsPage);
+}
+
+async function forceRefreshDreams() {
+  try {
+    const data = await api.dreams.status();
+    renderDreamsPage(data);
+  } catch (e) {
+    showToast('Failed to refresh dreams status', 'error');
+  }
+}
+
+function renderDreamsPage(data) {
+  if (!data) return;
+
+  // GPU badge
+  const badge = document.getElementById('dreamsGpuBadge');
+  const label = document.getElementById('dreamsGpuLabel');
+  const msg = document.getElementById('dreamsStatusMessage');
+  if (badge && label) {
+    if (data.pollError) {
+      badge.className = 'dreams-gpu-badge error';
+      label.textContent = 'Unreachable';
+    } else if (data.gpuConnected) {
+      badge.className = 'dreams-gpu-badge connected';
+      label.textContent = 'GPU Connected';
+    } else {
+      badge.className = 'dreams-gpu-badge disconnected';
+      label.textContent = 'Disconnected';
+    }
+  }
+  if (msg) {
+    if (data.pollError) {
+      msg.textContent = `Cannot reach core site: ${data.pollError}`;
+    } else if (data.gpuConnected) {
+      msg.textContent = `Streaming at ${data.generation?.fps?.toFixed(1) || '?'} FPS`;
+    } else {
+      msg.textContent = 'GPU not connected — waiting for Heimdall';
+    }
+  }
+
+  // Stats
+  const gen = data.generation || {};
+  const viewers = data.viewers || {};
+  const stream = data.stream || {};
+
+  pulseUpdate('dreamsFps', gen.fps != null ? gen.fps.toFixed(1) : '—');
+  pulseUpdate('dreamsFrames', gen.frame_count != null ? gen.frame_count.toLocaleString() : '—');
+  pulseUpdate('dreamsKeyframe', gen.current_keyframe ?? '—');
+  pulseUpdate('dreamsViewers', viewers.websocket_count ?? '—');
+  pulseUpdate('dreamsSamples', data.sampleCount ?? 0);
+
+  if (stream.total_bytes != null && stream.total_bytes > 0) {
+    pulseUpdate('dreamsThroughput', formatBytes(stream.total_bytes));
+  } else {
+    pulseUpdate('dreamsThroughput', '—');
+  }
+
+  // Poll error
+  const errorEl = document.getElementById('dreamsPollError');
+  if (errorEl) {
+    if (data.pollError) {
+      errorEl.textContent = `Poll error: ${data.pollError}`;
+      errorEl.style.display = 'block';
+    } else {
+      errorEl.style.display = 'none';
+    }
+  }
+
+  // Health windows
+  if (data.health) {
+    renderDreamsHealth(data.health);
+  }
+
+  // Preview iframe
+  renderDreamsPreview(data.gpuConnected);
+}
+
+function renderDreamsHealth(health) {
+  // Overall badge
+  const overallBadge = document.getElementById('dreamsOverallBadge');
+  if (overallBadge) {
+    const labels = { good: 'Healthy', degraded: 'Degraded', unhealthy: 'Unhealthy', no_data: 'No Data' };
+    overallBadge.className = `dreams-overall-badge ${health.overall}`;
+    overallBadge.textContent = labels[health.overall] || health.overall;
+  }
+
+  const grid = document.getElementById('dreamsHealthGrid');
+  if (!grid || !health.windows) return;
+
+  const windowLabels = { '1m': '1 Minute', '10m': '10 Minutes', '30m': '30 Minutes', '1h': '1 Hour' };
+
+  grid.innerHTML = Object.entries(health.windows).map(([key, w]) => {
+    const healthColors = { good: 'success', degraded: 'warning', unhealthy: 'error', no_data: '' };
+    const healthLabels = { good: 'Good', degraded: 'Degraded', unhealthy: 'Unhealthy', no_data: 'No Data' };
+
+    const flagsHtml = w.flags?.length
+      ? `<div class="dreams-window-flags">${w.flags.map(f => `<span class="dreams-flag">${f.replace('_', ' ')}</span>`).join('')}</div>`
+      : '';
+
+    if (w.sampleCount === 0) {
+      return `
+        <div class="dreams-health-window no_data">
+          <div class="dreams-window-header">
+            <span class="dreams-window-name">${windowLabels[key] || key}</span>
+            <span class="dreams-window-health" style="color: var(--text-muted);">No Data</span>
+          </div>
+          <div style="font-size: var(--text-xs); color: var(--text-muted);">No samples in window</div>
+        </div>
+      `;
+    }
+
+    return `
+      <div class="dreams-health-window ${w.health}">
+        <div class="dreams-window-header">
+          <span class="dreams-window-name">${windowLabels[key] || key}</span>
+          <span class="dreams-window-health" style="color: var(--${healthColors[w.health] || 'text-muted'});">${healthLabels[w.health] || w.health}</span>
+        </div>
+        <div class="dreams-window-stats">
+          <div class="dreams-window-stat">
+            <span>Avg FPS</span>
+            <span class="dreams-window-stat-value">${w.avgFps ?? '—'}</span>
+          </div>
+          <div class="dreams-window-stat">
+            <span>Min FPS</span>
+            <span class="dreams-window-stat-value">${w.minFps ?? '—'}</span>
+          </div>
+          <div class="dreams-window-stat">
+            <span>Delivery</span>
+            <span class="dreams-window-stat-value">${w.frameDeliveryRate != null ? w.frameDeliveryRate.toFixed(1) + '/s' : '—'}</span>
+          </div>
+          <div class="dreams-window-stat">
+            <span>Samples</span>
+            <span class="dreams-window-stat-value">${w.sampleCount}</span>
+          </div>
+          <div class="dreams-window-stat">
+            <span>Throughput</span>
+            <span class="dreams-window-stat-value">${w.throughputBytesPerSec != null ? formatBytes(w.throughputBytesPerSec) + '/s' : '—'}</span>
+          </div>
+          <div class="dreams-window-stat">
+            <span>Max Gap</span>
+            <span class="dreams-window-stat-value">${w.longestGapMs != null ? (w.longestGapMs / 1000).toFixed(1) + 's' : '—'}</span>
+          </div>
+        </div>
+        ${flagsHtml}
+      </div>
+    `;
+  }).join('');
+}
+
+let _dreamsPreviewLoaded = false;
+function renderDreamsPreview(gpuConnected) {
+  const container = document.getElementById('dreamsPreviewContainer');
+  const offline = document.getElementById('dreamsPreviewOffline');
+  if (!container) return;
+
+  if (gpuConnected && !_dreamsPreviewLoaded) {
+    container.innerHTML = `<iframe src="${window.location.protocol}//${window.location.hostname.replace('admin.', '')}/dreams?embed=1" loading="lazy" allow="autoplay"></iframe>`;
+    _dreamsPreviewLoaded = true;
+  } else if (!gpuConnected && _dreamsPreviewLoaded) {
+    container.innerHTML = '<div class="dreams-preview-offline">GPU not connected — no stream available</div>';
+    _dreamsPreviewLoaded = false;
+  }
+}
+
+function formatBytes(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+  if (bytes < 1073741824) return (bytes / 1048576).toFixed(1) + ' MB';
+  return (bytes / 1073741824).toFixed(2) + ' GB';
+}
+
+function openDreamsViewer(event) {
+  event.preventDefault();
+  const baseUrl = window.location.protocol + '//' + window.location.hostname.replace('admin.', '');
+  window.open(`${baseUrl}/dreams`, '_blank');
+}
+
+function openDreamsApi(event) {
+  event.preventDefault();
+  const baseUrl = window.location.protocol + '//' + window.location.hostname.replace('admin.', '');
+  window.open(`${baseUrl}/dreams/api`, '_blank');
+}
+
+window.loadDreams = loadDreams;
+window.forceRefreshDreams = forceRefreshDreams;
+window.openDreamsViewer = openDreamsViewer;
+window.openDreamsApi = openDreamsApi;
 
 // ============================================================================
 // BLOG MANAGEMENT
