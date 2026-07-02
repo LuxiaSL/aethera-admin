@@ -385,7 +385,10 @@
       color += starfieldLayer(uv, u_time);
 
       // Layer 2: Grain with aurora (additive chromatic)
-      color += grainAuroraLayer(uv, u_time);
+      // 0.5x clock: layerGrainFast scrolls the noise field over time (the old
+      // frosted sampler morphed slices in place), so the same rate reads as
+      // roughly double the motion — halve it to match the old feel.
+      color += grainAuroraLayer(uv, u_time * 0.5);
 
       // Layer 3: Moiré interference (subtle inversion blend)
       float moire = moireLayer(uv, u_time, aspect);
