@@ -34,6 +34,19 @@
   color: var(--text-muted);
 }
 
+/* 'error' state used by the Nin card (failed service) — missing from the
+   shared badge/dot classes, defined here */
+.service-status-badge.error {
+  background: rgba(248, 113, 113, 0.1);
+  border-color: rgba(248, 113, 113, 0.3);
+  color: var(--status-error);
+}
+
+.status-dot.error {
+  background: var(--status-error);
+  box-shadow: 0 0 8px var(--status-error);
+}
+
 /* --- Repo rows ------------------------------------------------------------ */
 
 .connectome-repos {
@@ -207,9 +220,9 @@
   flex-basis: 100%;
   margin: 0 0 var(--space-xs) var(--space-lg);
   padding: var(--space-xs) var(--space-sm);
-  background: var(--bg-primary);
+  background: var(--bg-tertiary);
   border-left: 2px solid var(--border-color);
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-size: var(--text-xs);
   max-height: 160px;
   overflow: auto;

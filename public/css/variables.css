@@ -14,18 +14,23 @@
   /* Color Palette - Pure void with high contrast */
   /* Semi-transparent to let shader show through */
   --bg-primary: transparent;
-  --bg-secondary: rgba(5, 5, 8, 0.85);
-  --bg-tertiary: rgba(10, 10, 15, 0.9);
-  --bg-elevated: rgba(15, 15, 20, 0.92);
-  
+  --bg-secondary: rgba(5, 5, 8, 0.92);
+  --bg-tertiary: rgba(10, 10, 15, 0.95);
+  --bg-elevated: rgba(15, 15, 20, 0.96);
+
+  /* Ink - solid dark for text on light/filled surfaces.
+     NEVER use --bg-primary as a text color: it is transparent
+     (that was the invisible-white-button bug). */
+  --ink: #05050a;
+
   /* Text - High contrast */
   --text-primary: #ffffff;
-  --text-secondary: #888899;
-  --text-muted: #555566;
-  
-  /* Borders - Subtle */
-  --border-color: #1a1a24;
-  --border-subtle: #111118;
+  --text-secondary: #9a9aae;
+  --text-muted: #6e6e82;
+
+  /* Borders - Subtle but defined */
+  --border-color: #2a2a3a;
+  --border-subtle: #1c1c28;
   
   /* Accent colors - Minimal, let content breathe */
   --accent-primary: #ffffff;

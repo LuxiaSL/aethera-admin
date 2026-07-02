@@ -383,7 +383,7 @@
    ============================================================================ */
 
 .console-output {
-  background: var(--bg-primary);
+  background: var(--bg-tertiary);
   color: var(--status-success);
   font-family: var(--font-mono);
   font-size: var(--text-sm);
@@ -629,7 +629,7 @@
 }
 
 .diff-output {
-  background: var(--bg-primary);
+  background: var(--bg-tertiary);
   font-family: var(--font-mono);
   font-size: var(--text-sm);
   padding: var(--space-md);

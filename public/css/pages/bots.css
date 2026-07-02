@@ -209,7 +209,7 @@
 
 .slot-btn.active {
   background: var(--text-primary);
-  color: var(--bg-primary);
+  color: var(--ink);
 }
 
 /* ============================================================================
@@ -233,7 +233,7 @@
 }
 
 .logs-output {
-  background: var(--bg-primary);
+  background: var(--bg-tertiary);
   color: var(--status-success);
   font-family: var(--font-mono);
   font-size: var(--text-sm);
@@ -251,7 +251,7 @@
 }
 
 .logs-output::-webkit-scrollbar-track {
-  background: var(--bg-primary);
+  background: var(--bg-tertiary);
 }
 
 .logs-output::-webkit-scrollbar-thumb {
@@ -265,7 +265,7 @@
 .config-editor {
   width: 100%;
   min-height: 400px;
-  background: var(--bg-primary);
+  background: var(--bg-tertiary);
   color: var(--text-primary);
   font-family: var(--font-mono);
   font-size: var(--text-sm);

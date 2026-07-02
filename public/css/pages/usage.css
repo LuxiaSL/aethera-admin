@@ -33,7 +33,7 @@
 
 .bots-sub-tab.active {
   background: var(--text-primary);
-  color: var(--bg-primary);
+  color: var(--ink);
 }
 
 .bots-subtab-content {
@@ -83,7 +83,7 @@
 
 .usage-period-tab.active {
   background: var(--accent-primary);
-  color: var(--bg-primary);
+  color: var(--ink);
 }
 
 .usage-actions {

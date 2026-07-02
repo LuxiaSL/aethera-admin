@@ -55,9 +55,6 @@ app.use('/api/stream', streamRoutes);
 app.use('/api/usage', usageRoutes);
 app.use('/api/connectome', connectomeRoutes);
 
-// Placeholder routes - will be implemented in later phases
-// app.use('/api/irc', require('./routes/irc'));
-
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({ 

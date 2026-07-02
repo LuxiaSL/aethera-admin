@@ -435,7 +435,7 @@
 
 .git-dep-commits .commit {
   padding: 1px 6px;
-  background: var(--bg-primary);
+  background: var(--bg-tertiary);
   border: 1px solid var(--border-subtle);
 }
 

@@ -55,7 +55,7 @@ body {
 /* Selection */
 ::selection {
   background: var(--text-primary);
-  color: var(--bg-primary);
+  color: var(--ink);
 }
 
 /* Links */
@@ -146,14 +146,14 @@ button:hover:not(:disabled) {
 }
 
 button:disabled {
-  opacity: 0.4;
+  opacity: 0.55;
   cursor: not-allowed;
 }
 
 /* Button variants */
 .btn-primary, button.primary {
   background: var(--text-primary);
-  color: var(--bg-primary);
+  color: var(--ink);
   border-color: var(--text-primary);
 }
 
@@ -182,7 +182,7 @@ button:disabled {
 
 .btn-danger:hover:not(:disabled), button.danger:hover:not(:disabled) {
   background: var(--status-error);
-  color: var(--bg-primary);
+  color: var(--ink);
   box-shadow: var(--glow-error);
 }
 
@@ -249,7 +249,7 @@ button:disabled {
 
 @keyframes pulse {
   0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
+  50% { opacity: 0.55; }
 }
 
 /* Animations */

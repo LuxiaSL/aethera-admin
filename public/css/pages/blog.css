@@ -51,7 +51,7 @@
 }
 
 .blog-filter-tab.active {
-  color: var(--bg-primary);
+  color: var(--ink);
   background: var(--text-primary);
 }
 
@@ -290,7 +290,7 @@
   font-size: var(--text-sm);
   line-height: 1.7;
   padding: var(--space-md);
-  background: var(--bg-primary);
+  background: var(--bg-tertiary);
   border: 1px solid var(--border-subtle);
   color: var(--text-primary);
   resize: none;
@@ -313,7 +313,7 @@
   flex: 1;
   min-height: 400px;
   padding: var(--space-md);
-  background: var(--bg-primary);
+  background: var(--bg-tertiary);
   border: 1px solid var(--border-subtle);
   overflow-y: auto;
   color: var(--text-primary);
@@ -407,7 +407,7 @@
 .metadata-field select {
   padding: var(--space-sm);
   font-size: var(--text-sm);
-  background: var(--bg-primary);
+  background: var(--bg-tertiary);
   border: 1px solid var(--border-subtle);
   color: var(--text-primary);
 }
@@ -562,7 +562,7 @@
 
 .btn-danger:hover {
   background: var(--status-error);
-  color: var(--bg-primary);
+  color: var(--ink);
   box-shadow: var(--glow-error);
 }
 
@@ -672,7 +672,7 @@
   width: 95vw;
   height: 95vh;
   max-width: 1400px;
-  background: var(--bg-primary);
+  background: var(--bg-tertiary);
   border: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
@@ -706,7 +706,7 @@
   font-size: var(--text-xs);
   color: var(--text-muted);
   padding: 2px 8px;
-  background: var(--bg-primary);
+  background: var(--bg-tertiary);
   border: 1px solid var(--border-subtle);
 }
 
