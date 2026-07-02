@@ -2336,7 +2336,7 @@ function renderConnectomeRepos(data) {
 
   const repos = data.repos || [];
   const deployRunning = data.deploy && data.deploy.status === 'running';
-  const anyBehind = repos.some(r => r.behind > 0);
+  const anyBehind = repos.some(r => r.behind > 0 || r.buildStale);
 
   const deployAllBtn = document.getElementById('connectomeDeployAllBtn');
   if (deployAllBtn) deployAllBtn.disabled = !anyBehind || deployRunning || connectomeActionInFlight;
@@ -2362,10 +2362,11 @@ function renderConnectomeRepos(data) {
       `;
     }
 
-    const upToDate = repo.behind === 0;
+    const deployable = repo.behind > 0 || repo.buildStale;
     let badge;
     if (repo.error) badge = `<span class="repo-badge error">error</span>`;
     else if (repo.behind > 0) badge = `<span class="repo-badge behind">↓ ${repo.behind} behind</span>`;
+    else if (repo.buildStale) badge = `<span class="repo-badge behind" title="dist/ is older than src/ — rebuild needed">build stale</span>`;
     else badge = `<span class="repo-badge uptodate">up to date</span>`;
 
     const dirtyBadge = repo.dirty
@@ -2375,7 +2376,7 @@ function renderConnectomeRepos(data) {
 
     const restartTargets = (repo.restarts || []).join(' + ');
     const disabled = deployRunning || connectomeActionInFlight ? 'disabled' : '';
-    const deployDisabled = upToDate || deployRunning || connectomeActionInFlight || (repo.dirty && !repo.lockfileOnly) ? 'disabled' : '';
+    const deployDisabled = !deployable || deployRunning || connectomeActionInFlight || (repo.dirty && !repo.lockfileOnly) ? 'disabled' : '';
 
     return `
       <div class="connectome-repo-row" data-repo="${repo.name}">
