@@ -76,6 +76,35 @@ function getChapterXSlots() {
 const CHAPTERX_SLOTS = scanChapterXSlots();
 
 // ============================================================================
+// CONNECTOME (Nin deploy panel)
+// ============================================================================
+
+const CONNECTOME_PATH = process.env.CONNECTOME_PATH || '/opt/connectome';
+
+// Declarative manifest of the source-run repos the panel can deploy.
+// `build` is the command run after a pull (null = no build step);
+// `restarts` lists the systemd services affected by a deploy.
+const CONNECTOME_REPOS = [
+  { name: 'connectome-host',       build: null,            restarts: ['nin'] },
+  { name: 'discord-mcpl',          build: 'npm run build', restarts: ['nin'] },
+  { name: 'heartbeat-mcpl',        build: 'npm run build', restarts: ['nin'] },
+  { name: 'terminal-sessions-mcp', build: 'npm run build', restarts: ['nin', 'nin-session'] },
+];
+
+// Nin runtime state (read-only for the panel — deploys must NEVER touch data/)
+const NIN_DATA_DIR = path.join(CONNECTOME_PATH, 'connectome-host', 'data');
+const NIN_SESSIONS_FILE = path.join(NIN_DATA_DIR, 'sessions.json');
+const NIN_SESSION_DIR = path.join(NIN_DATA_DIR, 'sessions');
+const NIN_DISCORD_DEBUG_LOG = path.join(NIN_DATA_DIR, 'discord-mcpl-debug.log');
+const NIN_HEARTBEAT_FILE = path.join(NIN_DATA_DIR, 'heartbeat-littleguy.json');
+
+// Laptop-daemon health endpoint (reachability probe)
+const LAPTOP_HEALTH_URL = process.env.LAPTOP_HEALTH_URL || 'http://kataletheia:3101/health';
+
+// Absolute bin paths — systemd runs with a minimal PATH (spec §5)
+const CONNECTOME_BIN_PATH = '/root/.bun/bin:/usr/local/bin:/usr/bin:/bin';
+
+// ============================================================================
 // AETHERA (CORE) INTEGRATION
 // ============================================================================
 
@@ -154,6 +183,17 @@ module.exports = {
   CHAPTERX_SLOTS,
   getChapterXSlots,  // Dynamic slot getter (recommended)
   scanChapterXSlots, // Force rescan
+
+  // Connectome
+  CONNECTOME_PATH,
+  CONNECTOME_REPOS,
+  NIN_DATA_DIR,
+  NIN_SESSIONS_FILE,
+  NIN_SESSION_DIR,
+  NIN_DISCORD_DEBUG_LOG,
+  NIN_HEARTBEAT_FILE,
+  LAPTOP_HEALTH_URL,
+  CONNECTOME_BIN_PATH,
   
   // Aethera integration
   AETHERA_API_URL,

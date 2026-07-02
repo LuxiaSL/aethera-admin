@@ -297,6 +297,54 @@ const api = {
   },
   
   // ============================================================================
+  // CONNECTOME (Nin deploy panel)
+  // ============================================================================
+
+  connectome: {
+    async status() {
+      return api.request('/connectome');
+    },
+
+    async fetch(repo) {
+      return api.request(`/connectome/repos/${repo}/fetch`, { method: 'POST' });
+    },
+
+    async deploy(repo, autoRestart = true) {
+      return api.request(`/connectome/repos/${repo}/deploy`, {
+        method: 'POST',
+        body: { autoRestart },
+      });
+    },
+
+    async deployAll(onlyBehind = true) {
+      return api.request('/connectome/deploy-all', {
+        method: 'POST',
+        body: { onlyBehind },
+      });
+    },
+
+    async restartNin() {
+      return api.request('/connectome/nin/restart', { method: 'POST' });
+    },
+
+    async restartNinFull() {
+      return api.request('/connectome/nin/restart-full', { method: 'POST' });
+    },
+
+    async restartSession() {
+      return api.request('/connectome/session/restart', { method: 'POST' });
+    },
+
+    async logs(lines = 200) {
+      return api.request(`/connectome/logs?lines=${lines}`);
+    },
+
+    async costReport() {
+      return api.request('/connectome/cost', { method: 'POST' });
+    },
+  },
+
+  // ============================================================================
   // DREAMS
   // ============================================================================
 

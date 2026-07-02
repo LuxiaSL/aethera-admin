@@ -23,6 +23,7 @@ const blogRoutes = require('./routes/blog');
 const serverRoutes = require('./routes/server');
 const streamRoutes = require('./routes/stream');
 const usageRoutes = require('./routes/usage');
+const connectomeRoutes = require('./routes/connectome');
 
 const app = express();
 
@@ -52,6 +53,7 @@ app.use('/api/blog', blogRoutes);
 app.use('/api/server', serverRoutes);
 app.use('/api/stream', streamRoutes);
 app.use('/api/usage', usageRoutes);
+app.use('/api/connectome', connectomeRoutes);
 
 // Placeholder routes - will be implemented in later phases
 // app.use('/api/irc', require('./routes/irc'));

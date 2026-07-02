@@ -23,6 +23,7 @@ const DOMAIN_CONFIG = {
   server:    { interval: 3000, aggregator: 'getServerData' },
   blog:      { interval: 30000, aggregator: 'getBlogData' },
   usage:     { interval: 10000, aggregator: 'getUsageData' },  // Sync + update every 10s
+  connectome: { interval: 4000, aggregator: 'getConnectomeData' }, // Nin deploy panel
 };
 
 // Track active connections for debugging/monitoring

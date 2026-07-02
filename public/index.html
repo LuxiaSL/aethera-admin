@@ -19,6 +19,7 @@
   <link rel="stylesheet" href="/css/pages/blog.css">
   <link rel="stylesheet" href="/css/pages/server.css">
   <link rel="stylesheet" href="/css/pages/usage.css">
+  <link rel="stylesheet" href="/css/pages/connectome.css">
   <link rel="stylesheet" href="/css/crt-overlay.css">
 </head>
 <body>
@@ -99,6 +100,7 @@
       <button class="nav-tab" data-page="bots">🤖 Bots</button>
       <button class="nav-tab" data-page="services">⚙️ Services</button>
       <button class="nav-tab" data-page="dreams">🎨 Dreams</button>
+      <button class="nav-tab" data-page="connectome">🧬 Connectome</button>
       <button class="nav-tab" data-page="blog">📝 Blog</button>
       <button class="nav-tab" data-page="irc">💬 IRC</button>
       <button class="nav-tab" data-page="server">🖥️ Server</button>
@@ -613,6 +615,149 @@
       <div class="dreams-links">
         <a href="#" class="dreams-link" onclick="openDreamsViewer(event)">Open Viewer</a>
         <a href="#" class="dreams-link" onclick="openDreamsApi(event)">API Docs</a>
+      </div>
+    </div>
+
+    <!-- Connectome Page -->
+    <div id="page-connectome" class="page-content">
+      <div class="page-header">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+          <div>
+            <h1 class="page-title">Connectome</h1>
+            <p class="page-subtitle">Nin deploy panel — pull, build, restart</p>
+          </div>
+          <button class="btn-secondary" onclick="forceRefreshConnectome()">⟳ Refresh</button>
+        </div>
+      </div>
+
+      <!-- Nin Status Card -->
+      <div class="connectome-section">
+        <h2 class="services-section-title">🌱 Nin (connectome-host)</h2>
+        <div class="service-card nin-card">
+          <div class="service-card-header">
+            <div class="service-card-info">
+              <div class="service-card-name">
+                nin.service
+                <span class="service-card-type">Systemd</span>
+              </div>
+              <div class="service-card-description">luxia's persistent companion — session <span id="ninSessionId" class="nin-session-id">—</span></div>
+            </div>
+            <div class="service-card-status">
+              <span id="ninStatusBadge" class="service-status-badge stopped">
+                <span class="status-dot stopped"></span>
+                Loading...
+              </span>
+              <span id="ninSessionBadge" class="service-health-badge" title="nin-session.service (terminal backend)">session: —</span>
+            </div>
+          </div>
+
+          <div class="service-stats nin-stats">
+            <div class="service-stat">
+              <span class="service-stat-label">Uptime</span>
+              <span class="service-stat-value" id="ninUptime">—</span>
+            </div>
+            <div class="service-stat">
+              <span class="service-stat-label">RSS</span>
+              <span class="service-stat-value" id="ninRss">—</span>
+            </div>
+            <div class="service-stat">
+              <span class="service-stat-label">Restarts</span>
+              <span class="service-stat-value" id="ninRestarts">—</span>
+            </div>
+            <div class="service-stat">
+              <span class="service-stat-label">Memory (records.log)</span>
+              <span class="service-stat-value" id="ninMemorySize">—</span>
+            </div>
+            <div class="service-stat">
+              <span class="service-stat-label">MCP Children</span>
+              <span class="service-stat-value" id="ninMcpChildren">—</span>
+            </div>
+            <div class="service-stat">
+              <span class="service-stat-label">Discord</span>
+              <span class="service-stat-value" id="ninDiscord">—</span>
+            </div>
+            <div class="service-stat">
+              <span class="service-stat-label">Laptop</span>
+              <span class="service-stat-value" id="ninLaptop">—</span>
+            </div>
+            <div class="service-stat">
+              <span class="service-stat-label">Heartbeat</span>
+              <span class="service-stat-value" id="ninHeartbeat">—</span>
+            </div>
+            <div class="service-stat">
+              <span class="service-stat-label">Cost (last run)</span>
+              <span class="service-stat-value" id="ninCost">—</span>
+            </div>
+          </div>
+
+          <div class="service-actions">
+            <button class="btn-secondary" onclick="restartNin()">🔄 Restart Nin</button>
+            <button class="btn-secondary" onclick="restartNinFull()">🔄 Restart Nin + daemons</button>
+            <button class="btn-secondary" onclick="viewNinLogs()">📜 View Logs</button>
+            <button class="btn-secondary" onclick="runNinCostReport()">💰 Cost Report</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Repos Section -->
+      <div class="connectome-section">
+        <div class="connectome-repos-header">
+          <h2 class="services-section-title">📦 Source Repos</h2>
+          <button id="connectomeDeployAllBtn" class="btn-primary" onclick="deployAllConnectome()" disabled>
+            🚀 Deploy All Behind
+          </button>
+        </div>
+        <p style="color: var(--text-secondary); font-size: var(--text-sm); margin-bottom: var(--space-md);">
+          Check = git fetch. Deploy = pull → build → restart affected services. Nin blips off Discord ~15s on restart; memory (data/) is never touched.
+        </p>
+        <div id="connectomeRepos" class="connectome-repos">
+          <div class="empty-state">
+            <div class="spinner"></div>
+            <p style="margin-top: var(--space-md);">Loading repos...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Deploy Output Pane -->
+      <div class="connectome-section" id="connectomeDeploySection" style="display: none;">
+        <h2 class="services-section-title">🛰️ Deploy Log</h2>
+        <div class="deploy-pane">
+          <div class="deploy-pane-header">
+            <span id="deployPaneTitle">—</span>
+            <span id="deployPaneStatus" class="deploy-status-badge">—</span>
+          </div>
+          <div id="deploySteps" class="deploy-steps"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Nin Logs Modal -->
+    <div id="ninLogsModal" class="modal-overlay logs-modal" onclick="closeNinLogsModal(event)">
+      <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-header">
+          <span class="modal-title">Nin Logs (journalctl -u nin)</span>
+          <button class="modal-close" onclick="closeNinLogsModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="logs-controls">
+            <button class="btn-secondary" onclick="refreshNinLogs()">🔄 Refresh</button>
+            <button class="btn-ghost" onclick="scrollNinLogsToBottom()">⬇️ Scroll to bottom</button>
+          </div>
+          <pre id="ninLogsOutput" class="logs-output">[Loading...]</pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- Nin Cost Modal -->
+    <div id="ninCostModal" class="modal-overlay logs-modal" onclick="closeNinCostModal(event)">
+      <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-header">
+          <span class="modal-title">Nin Cost Report</span>
+          <button class="modal-close" onclick="closeNinCostModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <pre id="ninCostOutput" class="logs-output">[Running...]</pre>
+        </div>
       </div>
     </div>
 

@@ -245,6 +245,9 @@ function navigateTo(page) {
     case 'dreams':
       loadDreams();
       break;
+    case 'connectome':
+      loadConnectome();
+      break;
     case 'blog':
       loadBlog();
       break;
@@ -2219,6 +2222,399 @@ window.loadDreams = loadDreams;
 window.forceRefreshDreams = forceRefreshDreams;
 window.openDreamsViewer = openDreamsViewer;
 window.openDreamsApi = openDreamsApi;
+
+// ============================================================================
+// CONNECTOME (Nin deploy panel)
+// ============================================================================
+
+let connectomeData = null;
+let connectomeActionInFlight = false; // disable buttons while an action runs
+
+function loadConnectome() {
+  streams.connect('connectome', (data) => {
+    connectomeData = data;
+    renderConnectomePage(data);
+  });
+}
+
+async function forceRefreshConnectome() {
+  try {
+    const data = await api.connectome.status();
+    connectomeData = data;
+    renderConnectomePage(data);
+    showToast('Connectome status refreshed', 'success');
+  } catch (error) {
+    showToast(error.message || 'Refresh failed', 'error');
+  }
+}
+
+function renderConnectomePage(data) {
+  if (!data || data.error) return;
+  renderNinCard(data);
+  renderConnectomeRepos(data);
+  renderDeployPane(data.deploy);
+}
+
+function renderNinCard(data) {
+  const host = data.nin?.host || {};
+  const session = data.nin?.session || {};
+  const rt = data.runtime || {};
+
+  // Status badges
+  const badge = document.getElementById('ninStatusBadge');
+  if (badge) {
+    const cls = host.running ? 'running' : (host.state === 'failed' ? 'error' : 'stopped');
+    badge.className = `service-status-badge ${cls}`;
+    badge.innerHTML = `<span class="status-dot ${cls}"></span> ${escapeHtml(host.state || 'unknown')}`;
+  }
+  const sessionBadge = document.getElementById('ninSessionBadge');
+  if (sessionBadge) {
+    sessionBadge.textContent = `session: ${session.running ? 'active' : (session.state || 'unknown')}`;
+    sessionBadge.className = `service-health-badge ${session.running ? 'healthy' : 'unhealthy'}`;
+  }
+
+  // Uptime from systemd timestamp
+  let uptime = '—';
+  if (host.startedAt) {
+    const started = new Date(host.startedAt).getTime();
+    if (!isNaN(started)) uptime = formatUptime(Math.floor((Date.now() - started) / 1000));
+  }
+  pulseUpdate('ninUptime', uptime);
+  pulseUpdate('ninRss', host.memoryBytes != null ? formatBytes(host.memoryBytes) : '—');
+  pulseUpdate('ninRestarts', host.restartCount ?? '—');
+
+  // Memory readout
+  const mem = rt.memory || {};
+  document.getElementById('ninSessionId').textContent = mem.sessionId || '—';
+  pulseUpdate('ninMemorySize', mem.recordsLogBytes != null ? formatBytes(mem.recordsLogBytes) : '—');
+
+  // MCP children
+  const mcp = rt.mcpChildren || {};
+  const mcpEl = document.getElementById('ninMcpChildren');
+  if (mcpEl) {
+    mcpEl.textContent = `${mcp.count ?? 0}/${mcp.expected ?? 5}`;
+    mcpEl.className = `service-stat-value ${(mcp.count ?? 0) >= (mcp.expected ?? 5) ? 'ok' : 'warn'}`;
+    mcpEl.title = (mcp.children || []).join(', ');
+  }
+
+  // Discord / laptop
+  const discord = rt.discord || {};
+  const discordEl = document.getElementById('ninDiscord');
+  if (discordEl) {
+    discordEl.textContent = discord.connected ? '✓ connected' : (discord.childRunning ? '~ child up' : '✗ down');
+    discordEl.className = `service-stat-value ${discord.connected ? 'ok' : 'warn'}`;
+    if (discord.lastMarker) discordEl.title = `last activity marker: ${discord.lastMarker}`;
+  }
+  const laptop = rt.laptop || {};
+  const laptopEl = document.getElementById('ninLaptop');
+  if (laptopEl) {
+    laptopEl.textContent = laptop.reachable ? '✓ reachable' : '✗ offline';
+    laptopEl.className = `service-stat-value ${laptop.reachable ? 'ok' : 'muted'}`;
+  }
+
+  // Heartbeat
+  const hb = rt.heartbeat || {};
+  const hbEl = document.getElementById('ninHeartbeat');
+  if (hbEl) {
+    if (!hb.available) hbEl.textContent = '—';
+    else if (hb.paused) hbEl.textContent = '⏸ paused';
+    else hbEl.textContent = `every ${formatUptime(hb.intervalSeconds || 0)}`;
+  }
+
+  // Cost (last manual run)
+  const cost = rt.lastCostReport;
+  const costEl = document.getElementById('ninCost');
+  if (costEl) {
+    costEl.textContent = cost && cost.total != null ? `$${cost.total.toFixed(2)}` : 'not run';
+    if (cost) costEl.title = `as of ${cost.at}`;
+  }
+}
+
+function renderConnectomeRepos(data) {
+  const container = document.getElementById('connectomeRepos');
+  if (!container) return;
+
+  const repos = data.repos || [];
+  const deployRunning = data.deploy && data.deploy.status === 'running';
+  const anyBehind = repos.some(r => r.behind > 0);
+
+  const deployAllBtn = document.getElementById('connectomeDeployAllBtn');
+  if (deployAllBtn) deployAllBtn.disabled = !anyBehind || deployRunning || connectomeActionInFlight;
+
+  if (repos.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">📦</div>
+        <p class="empty-state-title">No repos found</p>
+        <p class="empty-state-description">Expected git repos under /opt/connectome</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = repos.map(repo => {
+    if (!repo.exists || !repo.isGitRepo) {
+      return `
+        <div class="connectome-repo-row error">
+          <div class="repo-name">${escapeHtml(repo.name)}</div>
+          <div class="repo-status-text">${!repo.exists ? 'directory missing' : 'not a git repo'} — ${escapeHtml(repo.path || '')}</div>
+        </div>
+      `;
+    }
+
+    const upToDate = repo.behind === 0;
+    let badge;
+    if (repo.error) badge = `<span class="repo-badge error">error</span>`;
+    else if (repo.behind > 0) badge = `<span class="repo-badge behind">↓ ${repo.behind} behind</span>`;
+    else badge = `<span class="repo-badge uptodate">up to date</span>`;
+
+    const dirtyBadge = repo.dirty
+      ? `<span class="repo-badge dirty" title="${escapeHtml((repo.dirtyFiles || []).join(', '))}">${repo.lockfileOnly ? 'lockfile drift' : '● dirty'}</span>`
+      : '';
+    const aheadBadge = repo.ahead > 0 ? `<span class="repo-badge ahead">↑ ${repo.ahead} ahead</span>` : '';
+
+    const restartTargets = (repo.restarts || []).join(' + ');
+    const disabled = deployRunning || connectomeActionInFlight ? 'disabled' : '';
+    const deployDisabled = upToDate || deployRunning || connectomeActionInFlight || (repo.dirty && !repo.lockfileOnly) ? 'disabled' : '';
+
+    return `
+      <div class="connectome-repo-row" data-repo="${repo.name}">
+        <div class="repo-main">
+          <div class="repo-name">${escapeHtml(repo.name)}</div>
+          <div class="repo-git-line">
+            <span class="repo-branch">${escapeHtml(repo.branch || '?')}</span>
+            <span class="repo-commit" title="${escapeHtml(repo.headSubject || '')}">${escapeHtml(repo.head || '—')} · ${escapeHtml(truncateStr(repo.headSubject || '', 56))}</span>
+          </div>
+          <div class="repo-meta-line">
+            ${badge} ${aheadBadge} ${dirtyBadge}
+            <span class="repo-restarts" title="services restarted on deploy">↻ ${escapeHtml(restartTargets)}</span>
+            ${repo.build ? `<span class="repo-build" title="build step">🔨 ${escapeHtml(repo.build)}</span>` : ''}
+          </div>
+        </div>
+        <div class="repo-actions">
+          <button class="btn-secondary" onclick="checkConnectomeRepo('${repo.name}')" ${disabled}>📥 Check</button>
+          <button class="btn-primary" onclick="deployConnectomeRepo('${repo.name}')" ${deployDisabled}>🚀 Deploy</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function truncateStr(str, n) {
+  return str.length > n ? str.slice(0, n - 1) + '…' : str;
+}
+
+function renderDeployPane(deploy) {
+  const section = document.getElementById('connectomeDeploySection');
+  if (!section) return;
+
+  if (!deploy) {
+    section.style.display = 'none';
+    return;
+  }
+  section.style.display = '';
+
+  document.getElementById('deployPaneTitle').textContent =
+    `${deploy.repo} — started ${new Date(deploy.startedAt).toLocaleTimeString()}`;
+
+  const statusEl = document.getElementById('deployPaneStatus');
+  statusEl.textContent = deploy.status;
+  statusEl.className = `deploy-status-badge ${deploy.status}`;
+
+  const stepsEl = document.getElementById('deploySteps');
+  stepsEl.innerHTML = (deploy.steps || []).map(step => {
+    const icon = step.status === 'ok' ? '✓' : step.status === 'failed' ? '✗' : '⟳';
+    return `
+      <div class="deploy-step ${step.status}">
+        <span class="deploy-step-icon">${icon}</span>
+        <span class="deploy-step-name">${escapeHtml(step.name)}</span>
+        ${step.output ? `<pre class="deploy-step-output">${escapeHtml(step.output)}</pre>` : ''}
+      </div>
+    `;
+  }).join('') + (deploy.error ? `<div class="deploy-step failed"><span class="deploy-step-icon">✗</span><span class="deploy-step-name">${escapeHtml(deploy.error)}</span></div>` : '');
+}
+
+// --- Actions ----------------------------------------------------------------
+
+async function checkConnectomeRepo(repo) {
+  if (connectomeActionInFlight) return;
+  connectomeActionInFlight = true;
+  try {
+    showToast(`Checking ${repo}...`, 'info');
+    const result = await api.connectome.fetch(repo);
+    if (result.status) {
+      const s = result.status;
+      showToast(s.behind > 0 ? `${repo}: ${s.behind} commit(s) behind` : `${repo} is up to date`, s.behind > 0 ? 'warning' : 'success');
+    }
+    await forceRefreshConnectomeQuiet();
+  } catch (error) {
+    showToast(error.message || 'Check failed', 'error');
+  } finally {
+    connectomeActionInFlight = false;
+  }
+}
+
+async function deployConnectomeRepo(repo) {
+  if (connectomeActionInFlight) return;
+  const repoData = (connectomeData?.repos || []).find(r => r.name === repo);
+  const restarts = (repoData?.restarts || []).join(' + ');
+  if (!confirm(`Deploy ${repo}?\n\nThis will git pull${repoData?.build ? ' → build' : ''} → restart ${restarts}.\nNin will blip off Discord for ~15s. data/ and .env are untouched.`)) {
+    return;
+  }
+  connectomeActionInFlight = true;
+  try {
+    showToast(`Deploying ${repo}...`, 'info');
+    const result = await api.connectome.deploy(repo, true);
+    if (result.success) {
+      showToast(
+        result.codeChanged
+          ? `Deployed ${repo}: ${result.beforeCommit} → ${result.afterCommit}`
+          : `${repo} already up to date`,
+        'success'
+      );
+      if (result.memoryCheck && result.memoryCheck.ok === false) {
+        showToast('⚠️ MEMORY CHECK FAILED — verify Nin\'s records.log!', 'error');
+      }
+    } else {
+      showToast(`Deploy failed: ${result.error || 'unknown error'}`, 'error');
+    }
+    renderDeployPane({ ...result, repo, startedAt: Date.now(), status: result.success ? 'done' : 'failed' });
+    await forceRefreshConnectomeQuiet();
+  } catch (error) {
+    showToast(error.message || 'Deploy failed', 'error');
+  } finally {
+    connectomeActionInFlight = false;
+  }
+}
+
+async function deployAllConnectome() {
+  if (connectomeActionInFlight) return;
+  const behind = (connectomeData?.repos || []).filter(r => r.behind > 0).map(r => r.name);
+  if (behind.length === 0) {
+    showToast('Everything is up to date', 'info');
+    return;
+  }
+  if (!confirm(`Deploy all repos behind origin/main?\n\n${behind.join('\n')}\n\nServices restart as needed; Nin blips off Discord ~15s.`)) {
+    return;
+  }
+  connectomeActionInFlight = true;
+  try {
+    showToast(`Deploying ${behind.length} repo(s)...`, 'info');
+    const result = await api.connectome.deployAll(true);
+    const deployed = (result.results || []).filter(r => !r.skipped);
+    const failed = deployed.filter(r => !r.success);
+    if (failed.length === 0) {
+      showToast(`Deployed: ${deployed.map(r => r.repo).join(', ') || 'nothing to do'}`, 'success');
+    } else {
+      showToast(`Deploy failures: ${failed.map(r => r.repo).join(', ')}`, 'error');
+    }
+    await forceRefreshConnectomeQuiet();
+  } catch (error) {
+    showToast(error.message || 'Deploy-all failed', 'error');
+  } finally {
+    connectomeActionInFlight = false;
+  }
+}
+
+async function restartNin() {
+  if (!confirm('Restart Nin?\n\nNin drops off Discord ~15s and resumes the same session. Memory (data/) is untouched.')) return;
+  try {
+    showToast('Restarting Nin...', 'info');
+    const result = await api.connectome.restartNin();
+    showToast(result.success ? 'Nin restarted' : 'Restart failed — check logs', result.success ? 'success' : 'error');
+    if (result.memoryCheck) {
+      showToast(`records.log: ${formatBytes(result.memoryCheck.before || 0)} → ${formatBytes(result.memoryCheck.after || 0)}`, 'info');
+    }
+    await forceRefreshConnectomeQuiet();
+  } catch (error) {
+    showToast(error.message || 'Restart failed', 'error');
+  }
+}
+
+async function restartNinFull() {
+  if (!confirm('Restart Nin + session daemon?\n\nBoth nin.service and nin-session.service restart. Nin drops off Discord ~15s.')) return;
+  try {
+    showToast('Restarting Nin + daemons...', 'info');
+    const result = await api.connectome.restartNinFull();
+    showToast(result.success ? 'Nin + session daemon restarted' : 'Restart failed — check logs', result.success ? 'success' : 'error');
+    await forceRefreshConnectomeQuiet();
+  } catch (error) {
+    showToast(error.message || 'Restart failed', 'error');
+  }
+}
+
+async function forceRefreshConnectomeQuiet() {
+  try {
+    const data = await api.connectome.status();
+    connectomeData = data;
+    renderConnectomePage(data);
+  } catch (e) {
+    // SSE will refresh shortly anyway
+  }
+}
+
+// --- Logs modal ---------------------------------------------------------------
+
+function viewNinLogs() {
+  document.getElementById('ninLogsModal').classList.add('active');
+  refreshNinLogs();
+}
+
+async function refreshNinLogs() {
+  const output = document.getElementById('ninLogsOutput');
+  output.textContent = '[Loading...]';
+  try {
+    const result = await api.connectome.logs(300);
+    output.textContent = result.logs || '[No logs]';
+    scrollNinLogsToBottom();
+  } catch (error) {
+    output.textContent = `[Error: ${error.message}]`;
+  }
+}
+
+function scrollNinLogsToBottom() {
+  const output = document.getElementById('ninLogsOutput');
+  output.scrollTop = output.scrollHeight;
+}
+
+function closeNinLogsModal(event) {
+  if (event && event.target !== event.currentTarget) return;
+  document.getElementById('ninLogsModal').classList.remove('active');
+}
+
+// --- Cost modal -----------------------------------------------------------------
+
+async function runNinCostReport() {
+  document.getElementById('ninCostModal').classList.add('active');
+  const output = document.getElementById('ninCostOutput');
+  output.textContent = '[Running cost report...]';
+  try {
+    const result = await api.connectome.costReport();
+    output.textContent = result.raw || JSON.stringify(result, null, 2);
+    await forceRefreshConnectomeQuiet();
+  } catch (error) {
+    output.textContent = `[Error: ${error.message}]`;
+  }
+}
+
+function closeNinCostModal(event) {
+  if (event && event.target !== event.currentTarget) return;
+  document.getElementById('ninCostModal').classList.remove('active');
+}
+
+window.loadConnectome = loadConnectome;
+window.forceRefreshConnectome = forceRefreshConnectome;
+window.checkConnectomeRepo = checkConnectomeRepo;
+window.deployConnectomeRepo = deployConnectomeRepo;
+window.deployAllConnectome = deployAllConnectome;
+window.restartNin = restartNin;
+window.restartNinFull = restartNinFull;
+window.viewNinLogs = viewNinLogs;
+window.refreshNinLogs = refreshNinLogs;
+window.scrollNinLogsToBottom = scrollNinLogsToBottom;
+window.closeNinLogsModal = closeNinLogsModal;
+window.runNinCostReport = runNinCostReport;
+window.closeNinCostModal = closeNinCostModal;
 
 // ============================================================================
 // BLOG MANAGEMENT
