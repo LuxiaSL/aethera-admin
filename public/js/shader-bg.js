@@ -102,14 +102,42 @@
    *  single static frame is steady state rather than a black boot frame. */
   const STATIC_FRAME_TIME = 120.0;
 
-  // Terminal proxy (iChannel0).
-  const PROXY_SCALE = 0.5;
+  // ── Terminal proxy (iChannel0) ──────────────────────────────────────────
+  //
+  // Drawn at FULL buffer resolution with REAL GLYPHS, and both of those are
+  // load-bearing rather than fussiness. medium.glsl's grain is applied purely
+  // multiplicatively — `color.rgb *= 1.0 + depth * m` — so it can only scale
+  // light that is already in the buffer. It has no additive term at all; only
+  // the sky's emission does, which is why the sky shows up on an empty screen
+  // and the grain does not.
+  //
+  // A first version drew soft rectangles over text line-boxes at 0.45 coverage
+  // and half resolution. Measured, that buffer peaked at 0.296 luma with NOTHING
+  // above 0.35, against real terminal text at ~0.84 — so the grain was scaling a
+  // field ~3x too dim, with no glyph-scale structure for the per-channel
+  // dispersion to fringe. The chromatic pools simply had nothing to work on.
+  //
+  // Real glyphs fix both at once, and delete the reason the blur existed: a
+  // solid bar of ink brightens the medium in a visible RECTANGLE, and letterforms
+  // do not.
+  const PROXY_SCALE = 1.0;
+  /** Bound the 2D redraw + texture upload on very large displays. */
+  const MAX_PROXY_PIXELS = 1_400_000;
   const TERM_BG = '#0f0a1a';        // ghostty `background`. medium.glsl's `lit`
                                      // gates are tuned to its luma (~0.052) —
                                      // any other base and readTerm misreads the
                                      // empty screen as written-on.
-  const GLYPH_COVERAGE = 0.45;       // fraction of a line-box a glyph run inks
-  const BLUR_OF_LINE = 0.55;         // blur radius as a fraction of line height
+  /**
+   * How hard the panel's content drives the medium. This is THE dial for grain
+   * strength: the grain is a ratio, so its visible depth is proportional to the
+   * luminance in this buffer and to nothing else. 1.0 puts panel text at the
+   * same luma a terminal's glyphs have. Runtime override: shaderBg.setInkGain().
+   */
+  const PROXY_INK_GAIN = 1.0;
+  const INK_GAIN_KEY = 'aethera-shader-ink-gain';
+
+  /** Only the wrapped-text fallback path still draws boxes, so it still blurs. */
+  const BLUR_OF_LINE = 0.55;
   const BLUR_MIN_PX = 1.2;
   const BLUR_MAX_PX = 7.0;
   const PROXY_REBUILD_MS = 220;
@@ -194,6 +222,13 @@ void main() {
       this.lastBuild = -Infinity;
       this.overflowed = false;
       this.lastRectCount = 0;
+
+      let gain = PROXY_INK_GAIN;
+      try {
+        const saved = Number(window.localStorage.getItem(INK_GAIN_KEY));
+        if (Number.isFinite(saved) && saved > 0) gain = saved;
+      } catch { /* storage unavailable — the default is fine */ }
+      this.inkGain = Math.min(Math.max(gain, 0), 2);
       this.supportsFilter = this.ctx !== null && typeof this.ctx.filter === 'string';
       this.observers = [];
       this.scheduled = false;
@@ -250,10 +285,18 @@ void main() {
     markDirty() { this.dirty = true; }
 
     resize(width, height) {
-      this.width = Math.max(1, Math.round(width * PROXY_SCALE));
-      this.height = Math.max(1, Math.round(height * PROXY_SCALE));
-      this.canvas.width = this.width;
-      this.canvas.height = this.height;
+      let w = Math.max(1, Math.round(width * PROXY_SCALE));
+      let h = Math.max(1, Math.round(height * PROXY_SCALE));
+      const px = w * h;
+      if (px > MAX_PROXY_PIXELS) {
+        const k = Math.sqrt(MAX_PROXY_PIXELS / px);
+        w = Math.max(1, Math.round(w * k));
+        h = Math.max(1, Math.round(h * k));
+      }
+      this.width = w;
+      this.height = h;
+      this.canvas.width = w;
+      this.canvas.height = h;
       this.dirty = true;
     }
 
@@ -280,11 +323,12 @@ void main() {
     }
 
     /**
-     * Rasterize the panel's text line-boxes. Not glyphs — line boxes, in the
-     * element's computed color, at a coverage that approximates how much of a
-     * cell a glyph run actually inks. That is enough for what the chain asks
-     * of this buffer: readTerm() samples it at ±3px for `ink` and ±30px for
-     * `heat`, both of which are neighbourhood maxima, not letterforms.
+     * Repaint the panel's text into the buffer the chain reads as its
+     * "terminal". Real glyphs at real luminance, because medium.glsl's grain is
+     * a RATIO — see the PROXY_SCALE note above for the measurement that forced
+     * this. Wrapped text nodes fall back to a blurred box, which is fine
+     * because they are rare in this UI and the box artifact only shows on large
+     * type.
      */
     draw() {
       const ctx = this.ctx;
@@ -292,19 +336,19 @@ void main() {
 
       ctx.globalCompositeOperation = 'source-over';
       ctx.filter = 'none';
+      ctx.globalAlpha = 1;
       ctx.fillStyle = TERM_BG;
       ctx.fillRect(0, 0, this.width, this.height);
+      ctx.textBaseline = 'top';
+      // Applied to the ink only, never to the TERM_BG fill above — the base
+      // field has to stay at #0f0a1a's luma or readTerm's gates all shift.
+      ctx.globalAlpha = this.inkGain;
 
       const sx = this.width / Math.max(1, window.innerWidth);
       const sy = this.height / Math.max(1, window.innerHeight);
 
-      // Soft edges, scaled to the text size. A hard rect makes `ink` binary and
-      // the medium then brightens in a visible RECTANGLE — real glyphs modulate
-      // the ink field across the line, a solid bar does not, and the larger the
-      // type the more obviously the box shows. Blurring by a fraction of the
-      // line height hides the box at every size instead of only at body text.
-      ctx.globalAlpha = GLYPH_COVERAGE;
       let blurBucket = -1;
+      let filterOn = false;
 
       const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
         acceptNode(node) {
@@ -331,37 +375,59 @@ void main() {
         }
 
         const parent = node.parentElement;
-        let color = colorCache.get(parent);
-        if (color === undefined) {
+        let style = colorCache.get(parent);
+        if (style === undefined) {
           const cs = window.getComputedStyle(parent);
-          color = (cs.visibility === 'hidden' || cs.display === 'none' || cs.opacity === '0')
+          style = (cs.visibility === 'hidden' || cs.display === 'none' || cs.opacity === '0')
             ? null
-            : cs.color;
-          colorCache.set(parent, color);
+            // Font rebuilt at proxy scale rather than reused verbatim: the
+            // canvas is not the viewport, so a 13px computed size has to become
+            // 13 * sy here or every glyph lands at the wrong weight.
+            : {
+              color: cs.color,
+              font: `${cs.fontStyle} ${cs.fontWeight} `
+                  + `${Math.max(1, parseFloat(cs.fontSize) * sy).toFixed(2)}px `
+                  + `${cs.fontFamily}`,
+            };
+          colorCache.set(parent, style);
         }
-        if (!color) continue;
+        if (!style) continue;
 
         range.selectNodeContents(node);
         const rects = range.getClientRects();
+
+        // One rect means one unwrapped line, so the string can be drawn as
+        // itself. The rect came from this very text, so fillText with the same
+        // font reproduces its extent — no overdraw past a clipping container.
+        const asGlyphs = rects.length === 1;
+
         for (let i = 0; i < rects.length; i++) {
           const r = rects[i];
           if (r.width <= 0 || r.height <= 0) continue;
           if (r.bottom < 0 || r.top > vh || r.right < 0 || r.left > vw) continue;
 
-          if (this.supportsFilter) {
-            // Bucketed to 0.5px so a page of same-size text does not reassign
-            // ctx.filter hundreds of times per rebuild.
-            const h = r.height * sy;
-            const blur = Math.min(BLUR_MAX_PX, Math.max(BLUR_MIN_PX, h * BLUR_OF_LINE));
-            const bucket = Math.round(blur * 2);
-            if (bucket !== blurBucket) {
-              blurBucket = bucket;
-              ctx.filter = `blur(${(bucket / 2).toFixed(1)}px)`;
+          ctx.fillStyle = style.color;
+
+          if (asGlyphs) {
+            if (filterOn) { ctx.filter = 'none'; filterOn = false; blurBucket = -1; }
+            ctx.font = style.font;
+            ctx.fillText(node.nodeValue, r.left * sx, r.top * sy);
+          } else {
+            if (this.supportsFilter) {
+              // Bucketed to 0.5px so a page of same-size text does not reassign
+              // ctx.filter hundreds of times per rebuild.
+              const h = r.height * sy;
+              const blur = Math.min(BLUR_MAX_PX, Math.max(BLUR_MIN_PX, h * BLUR_OF_LINE));
+              const bucket = Math.round(blur * 2);
+              if (bucket !== blurBucket) {
+                blurBucket = bucket;
+                filterOn = true;
+                ctx.filter = `blur(${(bucket / 2).toFixed(1)}px)`;
+              }
             }
+            ctx.fillRect(r.left * sx, r.top * sy, r.width * sx, r.height * sy);
           }
 
-          ctx.fillStyle = color;
-          ctx.fillRect(r.left * sx, r.top * sy, r.width * sx, r.height * sy);
           drawn++;
           if (drawn >= MAX_TEXT_RECTS) break;
         }
@@ -844,6 +910,27 @@ void main() {
       }
     }
 
+    /**
+     * Grain strength, effectively. The grain is multiplicative, so how visible
+     * it is depends entirely on the luminance of the buffer it scales; 1.0 is
+     * "panel text is as bright as terminal glyphs". Persisted, since the point
+     * of the dial is tuning it against the live panel.
+     */
+    setInkGain(gain) {
+      if (typeof gain !== 'number' || !Number.isFinite(gain)) {
+        warn('setInkGain expects a number, got', gain);
+        return;
+      }
+      if (!this.proxy) { warn('no content proxy to tune'); return; }
+      this.proxy.inkGain = Math.min(Math.max(gain, 0), 2);
+      this.proxy.markDirty();
+      this.proxy.lastBuild = -Infinity;   // apply now, not after the cooldown
+      try { window.localStorage.setItem(INK_GAIN_KEY, String(this.proxy.inkGain)); }
+      catch { /* not persistable here; still applies for this session */ }
+      if (!this.running) this.drawFrame();
+      return this.proxy.inkGain;
+    }
+
     setQuality(scale) {
       if (typeof scale !== 'number' || !Number.isFinite(scale)) {
         warn('setQuality expects a number, got', scale);
@@ -995,6 +1082,8 @@ void main() {
         renderer: this.gl ? this.rendererTag() : null,
         benching: this.bench !== null,
         proxyRects: this.proxy?.lastRectCount ?? 0,
+        proxySize: this.proxy ? [this.proxy.width, this.proxy.height] : null,
+        inkGain: this.proxy?.inkGain ?? null,
         shaderTime: (performance.now() - this.startTime) / 1000,
       };
     }

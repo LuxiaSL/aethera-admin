@@ -321,7 +321,7 @@ shader file:
 
 | | Terminal | Panel |
 |---|---|---|
-| `iChannel0` | the terminal's own glyphs | the panel's text line-boxes, rasterized in their computed colors onto `#0f0a1a` — so `ink` still parts the gas and a red error badge still warms the medium under it |
+| `iChannel0` | the terminal's own glyphs | the panel's text, redrawn as real glyphs in their computed colors onto `#0f0a1a` — so `ink` still parts the gas and a red error badge still warms the medium under it |
 | cursor uniforms | the text cursor | the mouse pointer, quantized to a synthetic cell so a move reads as a discrete jump |
 | `crt-finale` boot | 45s power-on, once per launch | the same animation on a warped clock: 1:1 through the dramatic phases, then eased onto `DURATION` by ~4.5s |
 
@@ -331,14 +331,35 @@ times — the visible part (cathode glow, scan line, raster expansion) is over b
 cut from 1.29× brightness overdrive straight to steady state, which is a pop,
 not a shorter boot. Warping the clock plays the whole animation, fast.
 
+#### Why the proxy draws real glyphs
+
+`medium.glsl`'s grain is applied purely multiplicatively — `color.rgb *= 1.0 +
+depth * m`, with no additive term. It can only scale light already in the
+buffer, so its visible strength is proportional to that buffer's luminance and
+nothing else. (The sky's emission *is* additive, deliberately: *"a purely
+multiplicative sky vanishes on an empty screen."* That is why the sky shows up
+here regardless and the grain does not.)
+
+A first version drew soft rectangles over text line-boxes at 0.45 coverage and
+half resolution. Measured, that buffer peaked at **0.296** luma with nothing
+above 0.35, against real terminal text at **0.84** — the grain was scaling a
+field ~3× too dim, with no glyph-scale structure for the per-channel dispersion
+to fringe, so the chromatic pools never appeared. Real glyphs restore both the
+peak *and* lower the mean (0.097 → 0.065), which matters in the same direction:
+a raised mean "quietly raises the floor the rest of the stack sits on top of."
+
+`shaderBg.setInkGain()` is the dial for this, and effectively the grain-strength
+knob.
+
 ### Runtime knobs
 
 Resolution scale is auto-tuned on first load (bench a few frames, fit
 `FRAME_BUDGET_MS`, persist per renderer + per chain hash). From the console:
 
 ```js
-shaderBg.status()        // chain, passes, resolution, renderer, scale
+shaderBg.status()        // chain, passes, resolution, renderer, scale, inkGain
 shaderBg.setQuality(0.8) // pin a scale (0.25–1.5)
+shaderBg.setInkGain(1.3) // grain strength — how hard content drives the medium
 shaderBg.retune()        // clear the saved scale and re-bench
 shaderBg.toggle()        // off → static CSS background
 ```
