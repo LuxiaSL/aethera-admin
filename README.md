@@ -287,6 +287,68 @@ RUNPOD_API_KEY=...
 RUNPOD_ENDPOINT_ID=...
 ```
 
+## Shader Background
+
+The panel's background is not a web effect that resembles the Ghostty terminal
+setup — it **is** the Ghostty shader chain, running the same `.glsl` files
+through the same ping-pong a terminal compositor uses.
+
+`public/shaders/` holds byte-identical copies of the active chain from
+`~/.config/ghostty/shaders`, plus `prologue.glsl` / `epilogue.glsl` (the uniform
+contract every pass compiles against). `chain.json` records the order. They are
+committed because the VPS has no `~/.config/ghostty` and deploys are a git push.
+
+### Keeping it in sync
+
+```bash
+npm run sync-shaders     # pull the live chain out of ~/.config/ghostty
+npm run check-shaders    # exit 1 if out of date, change nothing
+npm run verify-shaders   # headless chrome: does it compile and render?
+```
+
+`sync-shaders` **parses the chain from the real `config`** — the uncommented
+`custom-shader =` lines — rather than from a list stored here. A hand-maintained
+list is a list that silently goes stale, which is the exact failure this file
+used to have: it spent months rendering `moire-radial`, months after that pass
+was removed from the live chain for being a measured no-op.
+
+Shaders that leave the chain are deleted from `public/shaders/` on the next sync.
+
+### Where a browser is not a terminal
+
+Three adaptations, all in `public/js/shader-bg.js`, none of them edits to a
+shader file:
+
+| | Terminal | Panel |
+|---|---|---|
+| `iChannel0` | the terminal's own glyphs | the panel's text line-boxes, rasterized in their computed colors onto `#0f0a1a` — so `ink` still parts the gas and a red error badge still warms the medium under it |
+| cursor uniforms | the text cursor | the mouse pointer, quantized to a synthetic cell so a move reads as a discrete jump |
+| `crt-finale` boot | 45s power-on, once per launch | the same animation on a warped clock: 1:1 through the dramatic phases, then eased onto `DURATION` by ~4.5s |
+
+The boot warp exists because `crt-finale`'s phases sit at hardcoded absolute
+times — the visible part (cathode glow, scan line, raster expansion) is over by
+~1.35s and the rest is a slow settle out to t=42. Editing `DURATION` down would
+cut from 1.29× brightness overdrive straight to steady state, which is a pop,
+not a shorter boot. Warping the clock plays the whole animation, fast.
+
+### Runtime knobs
+
+Resolution scale is auto-tuned on first load (bench a few frames, fit
+`FRAME_BUDGET_MS`, persist per renderer + per chain hash). From the console:
+
+```js
+shaderBg.status()        // chain, passes, resolution, renderer, scale
+shaderBg.setQuality(0.8) // pin a scale (0.25–1.5)
+shaderBg.retune()        // clear the saved scale and re-bench
+shaderBg.toggle()        // off → static CSS background
+```
+
+The chain **refuses to run on a software rasterizer** (SwiftShader, llvmpipe):
+one frame of `medium.glsl` on a CPU takes tens of seconds and would freeze the
+tab, and no resolution scale rescues that. Those clients get the CSS fallback in
+`base.css` (`html.no-shader-bg`). Append `?shaderbg=force&shadert=120` to
+override — that is how `verify-shaders` exercises the chain headlessly.
+
 ## Related Projects
 
 | Component | Repository | Description |

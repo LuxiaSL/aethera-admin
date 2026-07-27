@@ -1,581 +1,953 @@
 /**
- * shader-bg.js - MEGA SHADER: luxia violet edition (perf pass 2026-07-02)
- * Combined: Starfield + Grain/Aurora + Moiré + CRT finishing
- * Re-derived from the Ghostty shader stack (~/.config/ghostty/shaders):
- *   starfield-depth.perfpass.glsl + grain.perfpass.glsl + moire-radial.glsl
+ * shader-bg.js — runs the LIVE Ghostty shader chain as the panel background.
  *
- * Perf notes (vs previous version):
- * - Grain layer ported from grain.perfpass.glsl: layerGrainFast() is ONE
- *   smoothNoise sample per layer instead of the frosted-cell bilinear
- *   (4x blobNoise x 2x smoothNoise = 8 per layer). 12 layers -> ~8x less ALU
- *   on the dominant layer.
- * - Aurora chroma rotation uses the small-angle approximation (angle is only
- *   ±0.25 rad) — no per-pixel sin/cos.
- * - JS side: renders at RESOLUTION_SCALE of CSS pixels (soft background —
- *   upscaling is invisible), 24fps cap, fully pauses when the tab is hidden
- *   or the effect is toggled off, static single frame for
- *   prefers-reduced-motion.
+ * This file used to be a hand-derived "mega shader": one pass that re-implemented
+ * a snapshot of the terminal stack from memory. It drifted, as that arrangement
+ * always will — it was still rendering moire-radial months after that pass was
+ * removed from the real chain for being a measured no-op.
+ *
+ * So it no longer re-implements anything. It fetches the actual .glsl files out
+ * of /shaders/ and runs them through the same ping-pong a terminal compositor
+ * does, against the same uniform contract (preview/prologue.glsl). The shader
+ * sources here are byte-identical to ~/.config/ghostty/shaders — see
+ * scripts/sync-shaders.mjs, which is the only way they get updated.
+ *
+ * Chain and order come from /shaders/chain.json, which the sync script writes
+ * by parsing the uncommented `custom-shader =` lines out of the real config.
+ * Nothing about the chain is written down twice.
+ *
+ * ── THE THREE PLACES A BROWSER IS NOT A TERMINAL ──────────────────────────
+ *
+ * 1. iChannel0. In Ghostty, pass 1 reads the terminal's own glyphs — that is
+ *    what crt-glow blooms, and what medium.glsl's readTerm() turns into `ink`
+ *    (how written-on a region is) and `heat` (its red-vs-green balance, which
+ *    modulates the refractive index). Here the UI is DOM sitting ON TOP of the
+ *    canvas, so the shader can never read it directly. TerminalProxy below
+ *    rasterizes the panel's actual text line-boxes, in their actual computed
+ *    colors, onto a #0f0a1a field — so the sky still parts around the text and
+ *    a red error badge still warms the medium under it.
+ *
+ * 2. The cursor. cursor-comet.glsl and medium.glsl both read iCurrentCursor /
+ *    iPreviousCursor / iTimeCursorChange. There are no cells here, so the mouse
+ *    pointer drives them, quantized to a synthetic cell so that a move reads as
+ *    a discrete jump the way a terminal cursor does.
+ *
+ * 3. The boot animation. See BOOT TIME WARP below.
+ *
+ * ── BOOT TIME WARP ────────────────────────────────────────────────────────
+ *
+ * crt-finale.glsl runs a power-on animation for DURATION = 45s. It is tempting
+ * to read that as "45 seconds of black" and shorten it, but the phases are at
+ * hardcoded absolute times and the dramatic ones are over early:
+ *
+ *     cathode glow  → 0.0-0.8s      raster expansion → 0.5-1.35s
+ *     horizontal line 0.25-1.2s     hv flash         ~0.33s
+ *     brightness overdrive → t=20   color convergence → t=25
+ *     warm-up scanlines    → t=42   DURATION (handoff) = 45
+ *
+ * So it is ~1.4s of black and then a 43s settle. Ghostty launches once and can
+ * afford that; this panel gets reloaded constantly and cannot.
+ *
+ * Editing DURATION would be the obvious fix and it is wrong: at t=4 the shader
+ * is still at 1.29x brightness overdrive with ~0.09 of warm-up scanline left,
+ * so handing off to steady state there is a visible POP, not a shorter boot.
+ *
+ * Instead crt-finale — and only crt-finale — gets a warped clock. Real time up
+ * to BOOT_LINEAR_UNTIL passes through 1:1, so the whole dramatic phase plays at
+ * true speed and stays in sync with crt-glow's own boot window (it holds
+ * pass-through until iTime 1.5, on the real clock). After that the clock
+ * accelerates on a smoothstep, reaching t=45 at BOOT_COMPRESSED_UNTIL, so the
+ * long settle plays out fully but fast, easing into steady state instead of
+ * cutting to it. Monotonic and continuous throughout.
+ *
+ * The payoff: every .glsl file here is byte-identical to the one Ghostty loads.
+ * No preprocessor rewriting, no per-target forks, nothing to keep in sync but
+ * the files themselves.
  */
 
-(function() {
+(function () {
   'use strict';
 
-  // Backbuffer scale relative to CSS pixels (not devicePixelRatio).
-  // 0.6 ≈ 2.8x fewer fragments than 1.0, ~6x fewer than the old 1.5x dpr.
-  const RESOLUTION_SCALE = 0.6;
+  // ═══════════════════════════════════════════════════════════════════════════
+  // CONFIG
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  const SHADER_BASE = '/shaders/';
   const TARGET_FPS = 24;
 
-  const vertexShaderSource = `#version 300 es
-    in vec2 a_position;
-    out vec2 v_uv;
+  /** GPU ms/frame we are willing to spend on a background. Well under the
+   *  41ms a 24fps frame allows — this is decoration behind a control panel,
+   *  and it shares the GPU with whatever else the machine is doing. */
+  const FRAME_BUDGET_MS = 8;
 
-    void main() {
-      v_uv = a_position * 0.5 + 0.5;
-      gl_Position = vec4(a_position, 0.0, 1.0);
-    }
-  `;
+  /** A single bench frame slower than this means no quality step will fit;
+   *  stop measuring and pin the floor rather than stall the page proving it. */
+  const BENCH_ABORT_MS = 80;
+  /** Hard wall-clock cap on the whole bench, however few frames it managed. */
+  const BENCH_DEADLINE_MS = 2500;
+
+  const QUALITY_STEPS = [1.0, 0.85, 0.7, 0.6, 0.5, 0.4];
+  const FALLBACK_SCALE = 0.6;
+  const STORAGE_KEY = 'aethera-shader-quality';
+
+  // Boot time warp (see header).
+  const BOOT_LINEAR_UNTIL = 1.5;
+  const BOOT_COMPRESSED_UNTIL = 4.5;
+  const BOOT_SHADER_DURATION = 45.0;
+  /** Only passes named here get the warped clock. Everything else animates on
+   *  the real one, or the chain desynchronizes. */
+  const TIME_WARPED_PASSES = new Set(['crt-finale.glsl']);
+
+  /** Time to render at when animation is suppressed — past DURATION, so the
+   *  single static frame is steady state rather than a black boot frame. */
+  const STATIC_FRAME_TIME = 120.0;
+
+  // Terminal proxy (iChannel0).
+  const PROXY_SCALE = 0.5;
+  const TERM_BG = '#0f0a1a';        // ghostty `background`. medium.glsl's `lit`
+                                     // gates are tuned to its luma (~0.052) —
+                                     // any other base and readTerm misreads the
+                                     // empty screen as written-on.
+  const GLYPH_COVERAGE = 0.45;       // fraction of a line-box a glyph run inks
+  const BLUR_OF_LINE = 0.55;         // blur radius as a fraction of line height
+  const BLUR_MIN_PX = 1.2;
+  const BLUR_MAX_PX = 7.0;
+  const PROXY_REBUILD_MS = 220;
+  const MAX_TEXT_RECTS = 900;
+
+  // Synthetic cursor cell.
+  const CELL_ROWS = 45;              // buffer height / this = cell height
+  const CELL_ASPECT = 0.45;
+  const CURSOR_COLOR = [0.91, 0.47, 0.98, 1.0];
+
+  const VERTEX_SOURCE = `#version 300 es
+void main() {
+  vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2);
+  gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0);
+}`;
+
+  const UNIFORM_NAMES = [
+    'iResolution', 'iTime', 'iTimeDelta', 'iFrame', 'iDate', 'iChannel0',
+    'iCurrentCursor', 'iPreviousCursor', 'iCurrentCursorColor', 'iTimeCursorChange',
+  ];
+
+  /**
+   * Renderers with no GPU behind them. This chain is not merely slow on these,
+   * it is unusable: one frame of medium.glsl on a CPU rasterizer takes tens of
+   * SECONDS, which freezes the tab — and no resolution scale rescues that, so
+   * the auto-tuner cannot help either (it never gets a second frame in which to
+   * notice). The panel is a control surface first; it gets the CSS background.
+   */
+  const SOFTWARE_RENDERER = /swiftshader|llvmpipe|softpipe|software|basic render|mesa offscreen/i;
+
+  /**
+   * Debug escape hatches, mirroring the ghostty preview harness:
+   *   ?shaderbg=force  run even on a software renderer (correctness checks)
+   *   ?shadert=120     start the shader clock here — past the boot animation,
+   *                    so a single captured frame is steady state
+   */
+  const QUERY = (() => {
+    try { return new URLSearchParams(window.location.search); }
+    catch { return new URLSearchParams(); }
+  })();
+  const FORCE_SOFTWARE = QUERY.get('shaderbg') === 'force';
+  const START_TIME_OFFSET = (() => {
+    const v = Number(QUERY.get('shadert'));
+    return Number.isFinite(v) && v > 0 ? v : 0;
+  })();
+
+  const log = (...a) => console.log('%c✦ shader-bg', 'color:#a78bfa', ...a);
+  const warn = (...a) => console.warn('✦ shader-bg', ...a);
+
+  /**
+   * Real seconds → crt-finale's clock. Identity through the dramatic phases,
+   * then a smoothstep-eased acceleration onto DURATION, then real-time again
+   * (past DURATION the shader only compares against it, so the value is free).
+   */
+  function warpBootTime(t) {
+    if (t <= BOOT_LINEAR_UNTIL) return t;
+    if (t >= BOOT_COMPRESSED_UNTIL) return BOOT_SHADER_DURATION + (t - BOOT_COMPRESSED_UNTIL);
+    const u = (t - BOOT_LINEAR_UNTIL) / (BOOT_COMPRESSED_UNTIL - BOOT_LINEAR_UNTIL);
+    const eased = u * u * (3.0 - 2.0 * u);
+    return BOOT_LINEAR_UNTIL + (BOOT_SHADER_DURATION - BOOT_LINEAR_UNTIL) * eased;
+  }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // MEGA FRAGMENT SHADER
-  // Layer order: Starfield → Grain/Aurora → Moiré → CRT Post
+  // TERMINAL PROXY — the panel's own text, as something the chain can read
   // ═══════════════════════════════════════════════════════════════════════════
-  const fragmentShaderSource = `#version 300 es
-    precision highp float;
 
-    uniform vec2 u_resolution;
-    uniform float u_time;
+  const SKIP_TAGS = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'CANVAS', 'TEXTAREA', 'TITLE']);
 
-    in vec2 v_uv;
-    out vec4 fragColor;
+  class TerminalProxy {
+    constructor(gl) {
+      this.gl = gl;
+      this.canvas = document.createElement('canvas');
+      this.ctx = this.canvas.getContext('2d', { alpha: false, willReadFrequently: false });
+      this.texture = null;
+      this.width = 0;
+      this.height = 0;
+      this.dirty = true;
+      // -Infinity, not 0: PROXY_REBUILD_MS is a cooldown measured against
+      // performance.now(), and at first paint that is typically under 220ms —
+      // so a 0 here rate-limits the FIRST build, which is the one build that
+      // must not be skipped.
+      this.lastBuild = -Infinity;
+      this.overflowed = false;
+      this.lastRectCount = 0;
+      this.supportsFilter = this.ctx !== null && typeof this.ctx.filter === 'string';
+      this.observers = [];
+      this.scheduled = false;
 
-    const float TAU = 6.28318530718;
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // SHARED UTILITIES
-    // ═══════════════════════════════════════════════════════════════════════
-
-    float hash11(float p) {
-      p = fract(p * 0.1031);
-      p *= p + 33.33;
-      p *= p + p;
-      return fract(p);
-    }
-
-    float hash21(vec2 p) {
-      p = fract(p * vec2(234.34, 435.345));
-      p += dot(p, p + 34.23);
-      return fract(p.x * p.y);
-    }
-
-    float noise1(float x) {
-      float i = floor(x);
-      float f = fract(x);
-      f = f * f * (3.0 - 2.0 * f);
-      return mix(hash11(i), hash11(i + 1.0), f);
-    }
-
-    float smoothNoise(vec2 p) {
-      vec2 i = floor(p);
-      vec2 f = fract(p);
-      f = f * f * (3.0 - 2.0 * f);
-      float a = hash21(i);
-      float b = hash21(i + vec2(1.0, 0.0));
-      float c = hash21(i + vec2(0.0, 1.0));
-      float d = hash21(i + vec2(1.0, 1.0));
-      return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
-    }
-
-    // Random unit vector without trig
-    vec2 randDir(float seed) {
-      vec2 v = vec2(hash11(seed) * 2.0 - 1.0, hash11(seed + 17.0) * 2.0 - 1.0);
-      return v * inversesqrt(dot(v, v) + 1e-6);
-    }
-
-    // Cheap triangular wave [0..1]
-    float tri01(float x) {
-      float f = fract(x);
-      return 1.0 - abs(f * 2.0 - 1.0);
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // LAYER 1: STARFIELD DEPTH (from starfield-depth.perfpass.glsl)
-    // Stars + dust wisps approaching from central vanishing point.
-    // No per-star trig: randDir + squared-distance falloff + triangle twinkle.
-    // ═══════════════════════════════════════════════════════════════════════
-
-    vec3 starfieldLayer(vec2 uv, float time) {
-      vec2 center = vec2(0.5, 0.5);
-      vec3 starLight = vec3(0.0);
-
-      const int NUM_STARS = 25;
-      float baseSpeed = 0.012;
-      float tBase = time * baseSpeed;
-
-      for (int i = 0; i < NUM_STARS; i++) {
-        float seed = float(i);
-        vec2 dir = randDir(seed);
-
-        float speedVar = 0.7 + hash11(seed + 100.0) * 0.6;
-        float birthOffset = hash11(seed + 200.0);
-        float depth = fract(tBase * speedVar + birthOffset);
-
-        vec2 starPos = center + dir * depth * 0.55;
-
-        vec2 dv = uv - starPos;
-        float d2 = dot(dv, dv);
-
-        float starSize = 0.0008 + depth * depth * 0.006;
-        float starSize2 = starSize * starSize;
-
-        float envelope = smoothstep(0.0, 0.15, depth) * smoothstep(1.0, 0.75, depth);
-
-        float twFreq = 2.0 + hash11(seed + 400.0) * 3.0;
-        float twinkle = 0.7 + 0.3 * tri01(time * twFreq + seed * 0.13);
-
-        float core = smoothstep(starSize2, 0.0, d2);
-        float brightness = core * envelope * twinkle * 0.35;
-
-        // Subtle color variation
-        vec3 starColor = vec3(0.9, 0.85, 1.0) + vec3(hash11(seed + 500.0) - 0.5) * 0.2;
-        starLight += brightness * starColor;
+      if (!this.ctx) {
+        warn('2D context unavailable — iChannel0 will be a flat field');
       }
-
-      // Dust wisps
-      float dustTime = time * 0.006;
-      for (int j = 0; j < 3; j++) {
-        float dustSeed = float(j) * 100.0;
-        vec2 dustDir = randDir(dustSeed + 3.0);
-
-        float dustSpeed = 0.4 + hash11(dustSeed + 10.0) * 0.4;
-        float dustBirth = hash11(dustSeed + 20.0);
-        float dustDepth = fract(dustTime * dustSpeed + dustBirth);
-
-        vec2 dustPos = center + dustDir * dustDepth * 0.5;
-
-        vec2 dv = uv - dustPos;
-        float dd2 = dot(dv, dv);
-
-        float dustSize = 0.04 + dustDepth * 0.12;
-        float dustSize2 = dustSize * dustSize;
-
-        float dustAlpha = smoothstep(dustSize2, (dustSize * 0.3) * (dustSize * 0.3), dd2);
-        dustAlpha *= smoothstep(0.0, 0.2, dustDepth) * smoothstep(1.0, 0.6, dustDepth);
-
-        vec3 dustColor = mix(vec3(0.5, 0.4, 0.6), vec3(0.4, 0.5, 0.6), hash11(dustSeed + 30.0));
-        starLight += dustAlpha * dustColor * 0.025;
-      }
-
-      return starLight;
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // LAYER 2: GRAIN WITH AURORA MODULATION (from grain.perfpass.glsl)
-    // Fast frosted blobs: ONE continuous value-noise sample per layer with
-    // smoothstep shaping, instead of the old bilinear-over-cells blobNoise
-    // (~8 smoothNoise per layer). Visual character preserved, ~8x cheaper.
-    // ═══════════════════════════════════════════════════════════════════════
-
-    vec2 flowField(vec2 uv, float t) {
-      vec2 q = uv * 1.5 + t * 0.3;
-      float nx = smoothNoise(q);
-      float ny = smoothNoise(q + 50.0);
-
-      float strengthMod = smoothNoise(uv * 0.3 + t * 0.05) * 0.6
-                        + smoothNoise(uv * 0.7 + t * 0.03 + 100.0) * 0.4;
-      strengthMod = 0.3 + strengthMod * 1.4;
-
-      return (vec2(nx, ny) - 0.5) * 0.35 * strengthMod;
-    }
-
-    float layerGrainFast(vec2 uv, float scale, float seed, float zBase) {
-      // Tiny per-seed offset breaks banding when multiple layers share scale.
-      vec2 seedOff = vec2(seed * 0.00012, seed * 0.00009);
-
-      float z = zBase + seed * 0.07;
-
-      // The old frosted sampler effectively sampled at cellId * 0.12 —
-      // fold that into the scale so spatial frequency stays similar.
-      float s = scale * 0.12;
-
-      // Seed as a 2D offset (avoid correlated axes)
-      vec2 seed2 = vec2(seed * 1.37, seed * 2.11);
-
-      // Smooth time evolution: drift the noise input with z
-      // (replaces the old 3D slice interpolation).
-      vec2 p = (uv + seedOff) * s + seed2 + vec2(z * 17.0, z * 37.0);
-
-      float n = smoothNoise(p);
-
-      // Shape into softer blobs (keeps the "dense chromatic pools" feel)
-      return smoothstep(0.20, 0.85, n);
-    }
-
-    vec3 grainAuroraLayer(vec2 uv, float time) {
-      float t = time * 0.10;
-
-      // Breathing (time-only -> cheap 1D noise)
-      float breath = sin(time * 0.1) * 0.5 + 0.5;
-      breath *= 0.7 + noise1(time * 0.04) * 0.3;
-
-      // Glass warp
-      float warp1 = smoothNoise(uv * 3.0 + t * 0.8) - 0.5;
-      float warp2 = smoothNoise(uv * 5.0 - t * 0.5 + 30.0) - 0.5;
-      vec2 glassOffset = vec2(
-        warp1 * 0.008 + warp2 * 0.004,
-        warp1 * 0.006 + warp2 * 0.004
-      );
-
-      vec2 baseUV = uv + glassOffset;
-      vec2 flow = flowField(baseUV, t);
-      vec2 warpedUV = baseUV + flow;
-
-      // Aurora modulation (very slow drift)
-      float auroraTime = time * 0.02;
-      float aurora = smoothNoise(uv * 0.4 + vec2(auroraTime, auroraTime * 0.7)) * 0.6
-                   + smoothNoise(uv * 0.8 + vec2(-auroraTime * 0.5, auroraTime * 0.3) + 50.0) * 0.4;
-      float auroraIntensity = 0.6 + aurora * 0.8;
-
-      // Aurora rotates chromatic direction slightly: angle in [-0.25, +0.25]
-      // rad -> small-angle approximation, no sin/cos.
-      float auroraAngle = (aurora - 0.5) * 0.5;
-      float sinA = auroraAngle;
-      float cosA = 1.0 - 0.5 * auroraAngle * auroraAngle;
-
-      // Chromatic spread with aurora modulation
-      float chroma = (0.02 + breath * 0.05) * auroraIntensity;
-      vec2 rBase = vec2(chroma, chroma * 0.4);
-      vec2 bBase = vec2(-chroma * 0.9, chroma * 0.5);
-
-      vec2 rOff = vec2(rBase.x * cosA - rBase.y * sinA, rBase.x * sinA + rBase.y * cosA);
-      vec2 bOff = vec2(bBase.x * cosA - bBase.y * sinA, bBase.x * sinA + bBase.y * cosA);
-
-      float zBase = t * 0.5;
-
-      // 4 overlapping blob scales per channel — each ONE noise sample now
-      float r = layerGrainFast(warpedUV + rOff, 40.0, 0.0, zBase)
-              + layerGrainFast(warpedUV + rOff, 25.0, 10.0, zBase) * 0.8
-              + layerGrainFast(warpedUV + rOff, 60.0, 5.0, zBase) * 0.5
-              + layerGrainFast(warpedUV + rOff, 15.0, 55.0, zBase) * 0.9;
-
-      float g = layerGrainFast(warpedUV, 40.0, 20.0, zBase)
-              + layerGrainFast(warpedUV, 25.0, 30.0, zBase) * 0.8
-              + layerGrainFast(warpedUV, 60.0, 25.0, zBase) * 0.5
-              + layerGrainFast(warpedUV, 15.0, 65.0, zBase) * 0.9;
-
-      float b = layerGrainFast(warpedUV + bOff, 40.0, 40.0, zBase)
-              + layerGrainFast(warpedUV + bOff, 25.0, 50.0, zBase) * 0.8
-              + layerGrainFast(warpedUV + bOff, 60.0, 45.0, zBase) * 0.5
-              + layerGrainFast(warpedUV + bOff, 15.0, 75.0, zBase) * 0.9;
-
-      vec3 grain = vec3(r, g, b) / 3.2;
-
-      // 0.36 (was 0.42): the fast grain variant has punchier pools than the
-      // old frosted average — trimmed so the background stays behind the text.
-      return (grain - 0.5) * 0.36;
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // LAYER 3: MOIRÉ RADIAL INTERFERENCE (from moire-radial.glsl)
-    // Hypnotic concentric ring interference; params synced to the local copy
-    // (RING_FREQUENCY 200, CENTER_SEPARATION 0.025), blend strengths kept
-    // from the panel tuning since this runs behind UI content.
-    // ═══════════════════════════════════════════════════════════════════════
-
-    float moireLayer(vec2 uv, float time, float aspect) {
-      const float RING_FREQUENCY = 200.0;
-      const float CENTER_SEPARATION = 0.025;
-      const float DRIFT_SPEED = 0.006;
-      const float BREATHE_SPEED = 0.02;
-
-      vec2 centered = vec2((uv.x - 0.5) * aspect, uv.y - 0.5);
-      float t = time * DRIFT_SPEED;
-
-      // Two orbiting ring centers
-      float orbitAngle = t * 0.5;
-      vec2 offset = vec2(cos(orbitAngle), sin(orbitAngle * 0.7)) * CENTER_SEPARATION * 0.5;
-
-      vec2 centerA = offset;
-      vec2 centerB = -offset;
-
-      float distA = length(centered - centerA);
-      float distB = length(centered - centerB);
-
-      float breathe = sin(time * BREATHE_SPEED) * 0.02;
-
-      float ringsA = sin((distA + breathe) * RING_FREQUENCY * TAU);
-      float ringsB = sin((distB - breathe * 0.7) * RING_FREQUENCY * TAU);
-
-      float interference = ringsA * ringsB;
-      float moire = (interference * 0.5 + 0.5);
-      moire = smoothstep(0.4, 0.7, moire);
-
-      // Secondary layer to break symmetry
-      vec2 centerC = vec2(0.03, -0.02);
-      float distC = length(centered - centerC);
-      float ringsC = sin(distC * RING_FREQUENCY * 0.85 * TAU);
-      float interference2 = ringsA * ringsC;
-      float moire2 = smoothstep(0.4, 0.7, interference2 * 0.5 + 0.5) * 0.6;
-
-      moire = mix(moire, moire2, 0.4);
-
-      // Soft radial falloff - effect lives in a ring
-      float edgeDist = length(centered);
-      float falloff = smoothstep(0.1, 0.3, edgeDist) * smoothstep(0.9, 0.5, edgeDist);
-      moire *= falloff;
-
-      return moire * 0.035;
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // LAYER 4: CRT POST-PROCESSING
-    // Scanlines, heat shimmer, vignette, power flicker
-    // ═══════════════════════════════════════════════════════════════════════
-
-    vec3 crtPostProcess(vec3 color, vec2 uv, vec2 fragCoord, float time) {
-      // Heat shimmer (bottom rises)
-      float heatTime = time * 0.12;
-      float heatStrength = (1.0 - uv.y) * 0.0012;
-      vec2 heatAngles = vec2(
-        uv.x * 12.0 + heatTime * 2.0 + uv.y * 3.0,
-        uv.x * 7.0 - heatTime * 1.3 + uv.y * 5.0
-      );
-      vec2 heatS = sin(heatAngles);
-      float heatShimmer = (heatS.x + heatS.y * 0.6) * heatStrength;
-
-      // Apply shimmer as subtle color shift
-      color.r += heatShimmer * 0.5;
-      color.b -= heatShimmer * 0.3;
-
-      // Scanlines
-      float scanline = sin(fragCoord.y * 1.5) * 0.03 + 1.0;
-      float interlace = sin(fragCoord.y * 0.5 + time * 4.0) * 0.015 + 1.0;
-      color *= scanline * interlace;
-
-      // VHS warmth - slight magenta/violet push
-      color = mix(color, color * vec3(1.04, 0.98, 1.06), 0.3);
-
-      // Vignette
-      vec2 center = uv - 0.5;
-      float dist2 = dot(center, center);
-      color *= 1.0 - dist2 * 0.4;
-
-      // Power flicker
-      color *= 1.0 + sin(time * 45.0) * 0.003;
-
-      // Subtle edge glow (inverted vignette for dreamy edges)
-      float edgeGlow = smoothstep(0.2, 0.5, dist2) * 0.02;
-      color += vec3(0.3, 0.2, 0.5) * edgeGlow;
-
-      return color;
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // MAIN COMPOSITION
-    // ═══════════════════════════════════════════════════════════════════════
-
-    void main() {
-      vec2 uv = v_uv;
-      vec2 fragCoord = uv * u_resolution;
-      float aspect = u_resolution.x / u_resolution.y;
-
-      // Base color - deep violet void
-      vec3 color = vec3(0.03, 0.015, 0.05);
-
-      // Layer 1: Starfield (additive)
-      color += starfieldLayer(uv, u_time);
-
-      // Layer 2: Grain with aurora (additive chromatic)
-      // 0.5x clock: layerGrainFast scrolls the noise field over time (the old
-      // frosted sampler morphed slices in place), so the same rate reads as
-      // roughly double the motion — halve it to match the old feel.
-      color += grainAuroraLayer(uv, u_time * 0.5);
-
-      // Layer 3: Moiré interference (subtle inversion blend)
-      float moire = moireLayer(uv, u_time, aspect);
-      vec3 inverted = 1.0 - color;
-      color = mix(color, inverted, moire * 0.6);
-      color += moire * 0.015; // slight luminance boost at interference peaks
-
-      // Layer 4: CRT post-processing
-      color = crtPostProcess(color, uv, fragCoord, u_time);
-
-      // Final clamp
-      color = clamp(color, 0.0, 1.0);
-
-      fragColor = vec4(color, 1.0);
-    }
-  `;
-
-  class ShaderBackground {
-    constructor() {
-      this.canvas = null;
-      this.gl = null;
-      this.program = null;
-      this.startTime = Date.now();
-      this.animationId = null;
-      this.uniforms = {};
-      this.enabled = true;
-      this.running = false;
-
-      this.lastFrameTime = 0;
-      this.targetFPS = TARGET_FPS;
-      this.frameInterval = 1000 / this.targetFPS;
-      this.resolutionScale = RESOLUTION_SCALE;
-
-      this.reducedMotion = window.matchMedia
-        && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     }
 
     init() {
-      this.canvas = document.createElement('canvas');
-      this.canvas.id = 'shader-bg';
-      this.canvas.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        z-index: -1;
-        pointer-events: none;
-      `;
-      document.body.insertBefore(this.canvas, document.body.firstChild);
+      const gl = this.gl;
+      this.texture = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, this.texture);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
-      this.gl = this.canvas.getContext('webgl2', {
-        alpha: false,
-        antialias: false,
-        preserveDrawingBuffer: false,
-        powerPreference: 'low-power'
-      });
+      // Seed with one TERM_BG texel so the texture is COMPLETE from frame zero.
+      // An unallocated texture samples as pure black, and black is not a
+      // neutral placeholder here: medium.glsl gates `ink`, `heat` and
+      // `nearLight` on luma clearing ~0.05-0.06, thresholds chosen against
+      // #0f0a1a's 0.052. A black iChannel0 reads as "screen is empty" and the
+      // sky quietly stops emitting.
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
+        new Uint8Array([0x0f, 0x0a, 0x1a, 0xff]));
 
-      if (!this.gl) {
-        console.warn('WebGL2 not supported, shader background disabled');
-        this.canvas.remove();
-        return false;
+      const markDirty = () => this.markDirty();
+
+      // Text moving under the viewport changes where the ink is, so scroll is
+      // as much a rebuild trigger as a DOM edit. rAF-coalesced.
+      const onScroll = () => {
+        if (this.scheduled) return;
+        this.scheduled = true;
+        requestAnimationFrame(() => { this.scheduled = false; markDirty(); });
+      };
+      window.addEventListener('scroll', onScroll, { passive: true, capture: true });
+      this.observers.push(() => window.removeEventListener('scroll', onScroll, { capture: true }));
+
+      if (typeof MutationObserver === 'function') {
+        const mo = new MutationObserver(markDirty);
+        mo.observe(document.body, {
+          childList: true, subtree: true, characterData: true,
+        });
+        this.observers.push(() => mo.disconnect());
       }
-
-      if (!this.createProgram()) {
-        console.warn('Failed to create shader program');
-        this.canvas.remove();
-        return false;
+      if (typeof ResizeObserver === 'function') {
+        const ro = new ResizeObserver(markDirty);
+        ro.observe(document.body);
+        this.observers.push(() => ro.disconnect());
       }
-
-      this.setupGeometry();
-
-      this.uniforms.resolution = this.gl.getUniformLocation(this.program, 'u_resolution');
-      this.uniforms.time = this.gl.getUniformLocation(this.program, 'u_time');
-
-      this.resize();
-      window.addEventListener('resize', () => {
-        this.resize();
-        if (!this.running) this.drawFrame(); // keep static frame crisp
-      });
-
-      // Fully stop the loop when the tab is hidden — no wasted wakeups.
-      document.addEventListener('visibilitychange', () => {
-        if (document.hidden) {
-          this.stop();
-        } else if (this.enabled && !this.reducedMotion) {
-          this.start();
-        }
-      });
-
-      if (this.reducedMotion) {
-        // Accessibility: render one static frame, no animation loop.
-        this.drawFrame();
-        console.log('✦ Mega shader: static frame (prefers-reduced-motion)');
-      } else {
-        this.start();
-        console.log(`✦ Mega shader initialized (perfpass): ${this.targetFPS}fps @ ${this.resolutionScale}x`);
-      }
-      return true;
     }
 
-    createShader(type, source) {
+    markDirty() { this.dirty = true; }
+
+    resize(width, height) {
+      this.width = Math.max(1, Math.round(width * PROXY_SCALE));
+      this.height = Math.max(1, Math.round(height * PROXY_SCALE));
+      this.canvas.width = this.width;
+      this.canvas.height = this.height;
+      this.dirty = true;
+    }
+
+    /** Rebuild + upload if dirty and off cooldown. Cheap no-op otherwise. */
+    update(now) {
+      if (!this.dirty || !this.texture) return;
+      if (now - this.lastBuild < PROXY_REBUILD_MS) return;
+      this.dirty = false;
+      this.lastBuild = now;
+
+      try {
+        this.draw();
+      } catch (err) {
+        warn('proxy draw failed, keeping previous frame:', err);
+        return;
+      }
+
       const gl = this.gl;
+      gl.bindTexture(gl.TEXTURE_2D, this.texture);
+      // Flipped: DOM y grows downward, GL uv.y grows upward.
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.canvas);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    }
+
+    /**
+     * Rasterize the panel's text line-boxes. Not glyphs — line boxes, in the
+     * element's computed color, at a coverage that approximates how much of a
+     * cell a glyph run actually inks. That is enough for what the chain asks
+     * of this buffer: readTerm() samples it at ±3px for `ink` and ±30px for
+     * `heat`, both of which are neighbourhood maxima, not letterforms.
+     */
+    draw() {
+      const ctx = this.ctx;
+      if (!ctx) return;
+
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.filter = 'none';
+      ctx.fillStyle = TERM_BG;
+      ctx.fillRect(0, 0, this.width, this.height);
+
+      const sx = this.width / Math.max(1, window.innerWidth);
+      const sy = this.height / Math.max(1, window.innerHeight);
+
+      // Soft edges, scaled to the text size. A hard rect makes `ink` binary and
+      // the medium then brightens in a visible RECTANGLE — real glyphs modulate
+      // the ink field across the line, a solid bar does not, and the larger the
+      // type the more obviously the box shows. Blurring by a fraction of the
+      // line height hides the box at every size instead of only at body text.
+      ctx.globalAlpha = GLYPH_COVERAGE;
+      let blurBucket = -1;
+
+      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+        acceptNode(node) {
+          if (!node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+          const parent = node.parentElement;
+          if (!parent || SKIP_TAGS.has(parent.tagName)) return NodeFilter.FILTER_REJECT;
+          return NodeFilter.FILTER_ACCEPT;
+        },
+      });
+
+      const colorCache = new Map();
+      const range = document.createRange();
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      let drawn = 0;
+
+      for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+        if (drawn >= MAX_TEXT_RECTS) {
+          if (!this.overflowed) {
+            this.overflowed = true;
+            warn(`proxy hit MAX_TEXT_RECTS (${MAX_TEXT_RECTS}); ink map is truncated`);
+          }
+          break;
+        }
+
+        const parent = node.parentElement;
+        let color = colorCache.get(parent);
+        if (color === undefined) {
+          const cs = window.getComputedStyle(parent);
+          color = (cs.visibility === 'hidden' || cs.display === 'none' || cs.opacity === '0')
+            ? null
+            : cs.color;
+          colorCache.set(parent, color);
+        }
+        if (!color) continue;
+
+        range.selectNodeContents(node);
+        const rects = range.getClientRects();
+        for (let i = 0; i < rects.length; i++) {
+          const r = rects[i];
+          if (r.width <= 0 || r.height <= 0) continue;
+          if (r.bottom < 0 || r.top > vh || r.right < 0 || r.left > vw) continue;
+
+          if (this.supportsFilter) {
+            // Bucketed to 0.5px so a page of same-size text does not reassign
+            // ctx.filter hundreds of times per rebuild.
+            const h = r.height * sy;
+            const blur = Math.min(BLUR_MAX_PX, Math.max(BLUR_MIN_PX, h * BLUR_OF_LINE));
+            const bucket = Math.round(blur * 2);
+            if (bucket !== blurBucket) {
+              blurBucket = bucket;
+              ctx.filter = `blur(${(bucket / 2).toFixed(1)}px)`;
+            }
+          }
+
+          ctx.fillStyle = color;
+          ctx.fillRect(r.left * sx, r.top * sy, r.width * sx, r.height * sy);
+          drawn++;
+          if (drawn >= MAX_TEXT_RECTS) break;
+        }
+      }
+
+      range.detach?.();
+      ctx.globalAlpha = 1;
+      ctx.filter = 'none';
+      this.lastRectCount = drawn;
+    }
+
+    destroy() {
+      for (const off of this.observers) {
+        try { off(); } catch { /* observer already gone */ }
+      }
+      this.observers = [];
+      if (this.texture) {
+        this.gl.deleteTexture(this.texture);
+        this.texture = null;
+      }
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SHADER CHAIN — ping-pong, exactly as the compositor does it
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  class ShaderChain {
+    constructor(gl) {
+      this.gl = gl;
+      this.passes = [];
+      this.ping = null;
+      this.pong = null;
+      this.vao = null;
+      this.width = 0;
+      this.height = 0;
+    }
+
+    compileShader(type, source, label) {
+      const gl = this.gl;
+      if (gl.isContextLost()) {
+        warn(`${label}: context already lost`);
+        return null;
+      }
       const shader = gl.createShader(type);
       gl.shaderSource(shader, source);
       gl.compileShader(shader);
-
       if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-        console.error('Shader compile error:', gl.getShaderInfoLog(shader));
+        warn(`${label}: compile failed\n${gl.getShaderInfoLog(shader) || '(empty log)'}`);
         gl.deleteShader(shader);
         return null;
       }
       return shader;
     }
 
-    createProgram() {
+    /** Build one pass. `source` is the untouched shader file. */
+    addPass(name, source, prologue, epilogue) {
       const gl = this.gl;
+      const vs = this.compileShader(gl.VERTEX_SHADER, VERTEX_SOURCE, `${name} (vert)`);
+      const fs = this.compileShader(gl.FRAGMENT_SHADER, prologue + source + epilogue, name);
+      if (!vs || !fs) return false;
 
-      const vertexShader = this.createShader(gl.VERTEX_SHADER, vertexShaderSource);
-      const fragmentShader = this.createShader(gl.FRAGMENT_SHADER, fragmentShaderSource);
+      const program = gl.createProgram();
+      gl.attachShader(program, vs);
+      gl.attachShader(program, fs);
+      gl.linkProgram(program);
+      gl.deleteShader(vs);
+      gl.deleteShader(fs);
 
-      if (!vertexShader || !fragmentShader) return false;
-
-      this.program = gl.createProgram();
-      gl.attachShader(this.program, vertexShader);
-      gl.attachShader(this.program, fragmentShader);
-      gl.linkProgram(this.program);
-
-      if (!gl.getProgramParameter(this.program, gl.LINK_STATUS)) {
-        console.error('Program link error:', gl.getProgramInfoLog(this.program));
+      if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+        warn(`${name}: link failed\n${gl.getProgramInfoLog(program)}`);
+        gl.deleteProgram(program);
         return false;
       }
 
-      gl.deleteShader(vertexShader);
-      gl.deleteShader(fragmentShader);
+      const uniforms = {};
+      for (const u of UNIFORM_NAMES) uniforms[u] = gl.getUniformLocation(program, u);
 
+      this.passes.push({ name, program, uniforms, warped: TIME_WARPED_PASSES.has(name) });
       return true;
     }
 
-    setupGeometry() {
+    makeTarget(width, height) {
       const gl = this.gl;
+      const tex = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      // RGBA8 on purpose — the same 8-bit the terminal composites in, and the
+      // same the canvas presents in. Anything wider here would hide banding
+      // the real chain produces (it is how moire-radial was caught rounding
+      // to zero: its perturbation never cleared one 8-bit level).
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
-      const vertices = new Float32Array([
-        -1, -1,
-         1, -1,
-        -1,  1,
-         1,  1
-      ]);
-
-      const vao = gl.createVertexArray();
-      gl.bindVertexArray(vao);
-
-      const buffer = gl.createBuffer();
-      gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-      gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
-
-      const positionLoc = gl.getAttribLocation(this.program, 'a_position');
-      gl.enableVertexAttribArray(positionLoc);
-      gl.vertexAttribPointer(positionLoc, 2, gl.FLOAT, false, 0, 0);
+      const fbo = gl.createFramebuffer();
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+      const ok = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      if (!ok) {
+        warn('framebuffer incomplete at', width, 'x', height);
+        return null;
+      }
+      return { tex, fbo };
     }
+
+    resize(width, height) {
+      const gl = this.gl;
+      if (width === this.width && height === this.height) return true;
+      for (const t of [this.ping, this.pong]) {
+        if (!t) continue;
+        gl.deleteTexture(t.tex);
+        gl.deleteFramebuffer(t.fbo);
+      }
+      this.ping = this.makeTarget(width, height);
+      this.pong = this.makeTarget(width, height);
+      if (!this.ping || !this.pong) return false;
+      this.width = width;
+      this.height = height;
+      if (!this.vao) this.vao = gl.createVertexArray();
+      return true;
+    }
+
+    /** @param {{time:number,delta:number,frame:number,date:number[],cursor:object}} f */
+    render(contentTex, f) {
+      const gl = this.gl;
+      const { width: w, height: h } = this;
+      const warpedTime = warpBootTime(f.time);
+      let srcTex = contentTex;
+
+      gl.bindVertexArray(this.vao);
+
+      for (let i = 0; i < this.passes.length; i++) {
+        const pass = this.passes[i];
+        const last = i === this.passes.length - 1;
+        const target = i % 2 === 0 ? this.ping : this.pong;
+
+        gl.bindFramebuffer(gl.FRAMEBUFFER, last ? null : target.fbo);
+        gl.viewport(0, 0, w, h);
+        gl.useProgram(pass.program);
+
+        gl.uniform3f(pass.uniforms.iResolution, w, h, 1);
+        gl.uniform1f(pass.uniforms.iTime, pass.warped ? warpedTime : f.time);
+        gl.uniform1f(pass.uniforms.iTimeDelta, f.delta);
+        gl.uniform1i(pass.uniforms.iFrame, f.frame);
+        gl.uniform4f(pass.uniforms.iDate, f.date[0], f.date[1], f.date[2], f.date[3]);
+
+        const c = f.cursor;
+        gl.uniform4f(pass.uniforms.iCurrentCursor, c.cur[0], c.cur[1], c.cellW, c.cellH);
+        gl.uniform4f(pass.uniforms.iPreviousCursor, c.prev[0], c.prev[1], c.cellW, c.cellH);
+        gl.uniform4f(pass.uniforms.iCurrentCursorColor, ...CURSOR_COLOR);
+        gl.uniform1f(pass.uniforms.iTimeCursorChange, c.changeTime);
+
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, srcTex);
+        gl.uniform1i(pass.uniforms.iChannel0, 0);
+
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+        if (!last) srcTex = target.tex;
+      }
+    }
+
+    destroy() {
+      const gl = this.gl;
+      for (const p of this.passes) gl.deleteProgram(p.program);
+      this.passes = [];
+      for (const t of [this.ping, this.pong]) {
+        if (!t) continue;
+        gl.deleteTexture(t.tex);
+        gl.deleteFramebuffer(t.fbo);
+      }
+      this.ping = this.pong = null;
+      if (this.vao) { gl.deleteVertexArray(this.vao); this.vao = null; }
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // BACKGROUND — lifecycle, quality auto-tune, cursor, visibility
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  class ShaderBackground {
+    constructor() {
+      this.canvas = null;
+      this.gl = null;
+      this.chain = null;
+      this.proxy = null;
+      this.manifest = null;
+
+      // Shifted back by ?shadert= so the clock starts mid-chain when asked.
+      this.startTime = performance.now() - START_TIME_OFFSET * 1000;
+      this.animationId = null;
+      this.enabled = true;
+      this.running = false;
+      this.ready = false;
+      this.failed = false;
+
+      this.frame = 0;
+      this.lastFrameTime = 0;
+      this.lastRenderClock = 0;
+      this.targetFPS = TARGET_FPS;
+      this.frameInterval = 1000 / TARGET_FPS;
+      this.resolutionScale = FALLBACK_SCALE;
+
+      this.dateVec = [1970, 0, 1, 0];
+      this.dateStamp = 0;
+
+      this.cursor = {
+        cur: [0, 0], prev: [0, 0], cellW: 8, cellH: 18, changeTime: -1e4,
+      };
+
+      this.bench = null;
+
+      this.reducedMotion = typeof window.matchMedia === 'function'
+        && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    }
+
+    // ── setup ───────────────────────────────────────────────────────────────
+
+    async init() {
+      try {
+        this.manifest = await this.loadManifest();
+      } catch (err) {
+        return this.giveUp(`could not load ${SHADER_BASE}chain.json: ${err.message}`);
+      }
+
+      this.canvas = document.createElement('canvas');
+      this.canvas.id = 'shader-bg';
+      document.body.insertBefore(this.canvas, document.body.firstChild);
+
+      this.gl = this.canvas.getContext('webgl2', {
+        alpha: false,
+        antialias: false,
+        depth: false,
+        stencil: false,
+        preserveDrawingBuffer: false,
+        powerPreference: 'low-power',
+      });
+      if (!this.gl) return this.giveUp('WebGL2 not supported');
+
+      const renderer = this.rendererTag();
+      if (SOFTWARE_RENDERER.test(renderer) && !FORCE_SOFTWARE) {
+        return this.giveUp(`software renderer (${renderer})`);
+      }
+
+      this.canvas.addEventListener('webglcontextlost', (e) => {
+        e.preventDefault();
+        this.stop();
+        warn('WebGL context lost — background suspended');
+      });
+      this.canvas.addEventListener('webglcontextrestored', () => {
+        warn('WebGL context restored — rebuilding');
+        this.rebuild();
+      });
+
+      let sources;
+      try {
+        sources = await this.loadSources();
+      } catch (err) {
+        return this.giveUp(`could not load shader sources: ${err.message}`);
+      }
+      this.sources = sources;
+
+      if (!this.buildChain()) return this.giveUp('shader chain failed to build');
+
+      this.proxy = new TerminalProxy(this.gl);
+      this.proxy.init();
+
+      this.resolutionScale = this.restoreQuality() ?? FALLBACK_SCALE;
+      if (!this.resize()) return this.giveUp('could not allocate render targets');
+
+      window.addEventListener('resize', () => {
+        this.resize();
+        if (!this.running) this.drawFrame();
+      });
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) this.stop();
+        else if (this.enabled && !this.reducedMotion) this.start();
+      });
+      window.addEventListener('pointermove', (e) => this.onPointerMove(e), { passive: true });
+
+      this.ready = true;
+      document.documentElement.dataset.shaderBg = `ok: ${this.manifest.chain.join(' → ')}`;
+
+      if (this.reducedMotion) {
+        this.drawFrame(STATIC_FRAME_TIME);
+        log('static frame (prefers-reduced-motion) —', this.manifest.chain.join(' → '));
+        return true;
+      }
+
+      if (this.restoreQuality() === null) this.beginBench();
+      this.start();
+      log(`${this.manifest.chain.length} passes @ ${this.targetFPS}fps, `
+        + `scale ${this.resolutionScale}${this.bench ? ' (benching…)' : ''}`);
+      log('chain:', this.manifest.chain.join(' → '));
+      return true;
+    }
+
+    async loadManifest() {
+      const res = await fetch(`${SHADER_BASE}chain.json`, { cache: 'no-cache' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const manifest = await res.json();
+      if (!Array.isArray(manifest.chain) || manifest.chain.length === 0) {
+        throw new Error('manifest has no chain');
+      }
+      return manifest;
+    }
+
+    async loadSources() {
+      const names = ['prologue.glsl', 'epilogue.glsl', ...this.manifest.chain];
+      const texts = await Promise.all(names.map(async (name) => {
+        const res = await fetch(SHADER_BASE + name);
+        if (!res.ok) throw new Error(`${name}: HTTP ${res.status}`);
+        return [name, await res.text()];
+      }));
+      return new Map(texts);
+    }
+
+    buildChain() {
+      const prologue = this.sources.get('prologue.glsl');
+      const epilogue = this.sources.get('epilogue.glsl');
+      if (!prologue || !epilogue) {
+        warn('missing prologue/epilogue — the uniform contract');
+        return false;
+      }
+      this.chain = new ShaderChain(this.gl);
+      for (const name of this.manifest.chain) {
+        const src = this.sources.get(name);
+        if (!src) { warn(`missing source for ${name}`); return false; }
+        // One bad pass is not a reason to drop the rest of the chain silently;
+        // it is a reason to fail loudly, because a chain missing a pass does not
+        // look like a degraded version of itself, it looks broken.
+        if (!this.chain.addPass(name, src, prologue, epilogue)) return false;
+      }
+      return this.chain.passes.length > 0;
+    }
+
+    rebuild() {
+      if (this.failed || !this.sources) return;
+      if (this.chain) this.chain.destroy();
+      if (!this.buildChain() || !this.resize()) {
+        this.giveUp('rebuild failed after context restore');
+        return;
+      }
+      if (this.enabled && !this.reducedMotion && !document.hidden) this.start();
+    }
+
+    giveUp(reason) {
+      this.failed = true;
+      this.ready = false;
+      warn(`${reason} — falling back to the static CSS background`);
+      document.documentElement.classList.add('no-shader-bg');
+      // Reflected onto the root element so the state is readable without a JS
+      // console — which is what lets scripts/verify-shader-bg.mjs assert on it,
+      // and what makes "is the background actually running" answerable over a
+      // screen share.
+      document.documentElement.dataset.shaderBg = `failed: ${reason}`;
+      if (this.canvas) { this.canvas.remove(); this.canvas = null; }
+      return false;
+    }
+
+    // ── quality ─────────────────────────────────────────────────────────────
+
+    rendererTag() {
+      try {
+        const dbg = this.gl.getExtension('WEBGL_debug_renderer_info');
+        return String(dbg
+          ? this.gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL)
+          : this.gl.getParameter(this.gl.RENDERER));
+      } catch {
+        return 'unknown';
+      }
+    }
+
+    /** Chain identity — retune when the shaders themselves change. */
+    chainTag() {
+      const files = this.manifest.files ?? {};
+      return this.manifest.chain.map((n) => `${n}@${files[n]?.sha256 ?? '?'}`).join(',');
+    }
+
+    restoreQuality() {
+      try {
+        const raw = window.localStorage.getItem(STORAGE_KEY);
+        if (!raw) return null;
+        const saved = JSON.parse(raw);
+        if (saved.renderer !== this.rendererTag()) return null;
+        if (saved.chain !== this.chainTag()) return null;
+        if (typeof saved.scale !== 'number' || !Number.isFinite(saved.scale)) return null;
+        return Math.min(Math.max(saved.scale, 0.25), 1.5);
+      } catch {
+        return null;  // private mode, quota, corrupt entry — all mean "retune"
+      }
+    }
+
+    saveQuality(scale) {
+      try {
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
+          scale, renderer: this.rendererTag(), chain: this.chainTag(),
+        }));
+      } catch { /* storage unavailable: retune next load, no worse than that */ }
+    }
+
+    /**
+     * Measure at the current scale, then pick the largest scale whose predicted
+     * cost fits FRAME_BUDGET_MS. Cost is taken as proportional to fragment
+     * count, which for a fixed chain of full-screen passes it essentially is.
+     *
+     * Runs during the boot animation, when the screen is mostly black anyway —
+     * gl.finish() per frame stalls the pipeline, so this is not something to do
+     * while anything is on screen worth looking at.
+     */
+    beginBench() {
+      this.bench = {
+        samples: [], warmup: 12, need: 24, last: 0, startedAt: performance.now(),
+      };
+    }
+
+    /** Give up on measuring and pin the lowest quality step. */
+    abortBench(why) {
+      const floor = QUALITY_STEPS[QUALITY_STEPS.length - 1];
+      this.bench = null;
+      warn(`bench aborted (${why}) — pinning scale ${floor}. Renderer: ${this.rendererTag()}`);
+      this.saveQuality(floor);
+      if (floor !== this.resolutionScale) {
+        this.resolutionScale = floor;
+        this.resize();
+      }
+    }
+
+    tickBench(now) {
+      const b = this.bench;
+      if (!b) return;
+      this.gl.finish();
+      const t = performance.now();
+
+      // Wall-clock deadline, checked BEFORE the warmup counter. Bench frames
+      // run uncapped with gl.finish(), so on a software rasterizer (and
+      // medium.glsl is 1590 lines of it) a single frame can take seconds — the
+      // page would sit frozen through a 12-frame warmup that never produces
+      // the sample a per-sample guard needs in order to fire.
+      if (t - b.startedAt > BENCH_DEADLINE_MS) {
+        this.abortBench(`${Math.round(t - b.startedAt)}ms elapsed, `
+          + `${b.samples.length} sample(s)`);
+        return;
+      }
+
+      if (b.warmup > 0) { b.warmup--; b.last = t; return; }
+      if (b.last > 0) b.samples.push(t - b.last);
+      b.last = t;
+
+      // Faster path for a GPU that is merely too slow rather than absent.
+      if (b.samples.length && Math.max(...b.samples) > BENCH_ABORT_MS) {
+        this.abortBench(`${Math.max(...b.samples).toFixed(0)}ms/frame at `
+          + `${this.chain.width}x${this.chain.height}`);
+        return;
+      }
+
+      if (b.samples.length < b.need) return;
+
+      const sorted = b.samples.slice().sort((a, c) => a - c);
+      const median = sorted[Math.floor(sorted.length / 2)];
+      const frags = this.chain.width * this.chain.height;
+      const perFrag = median / Math.max(1, frags);
+
+      let chosen = QUALITY_STEPS[QUALITY_STEPS.length - 1];
+      for (const step of QUALITY_STEPS) {
+        const w = window.innerWidth * step;
+        const h = window.innerHeight * step;
+        if (perFrag * w * h <= FRAME_BUDGET_MS) { chosen = step; break; }
+      }
+
+      this.bench = null;
+      log(`bench: ${median.toFixed(2)}ms @ ${this.chain.width}x${this.chain.height}`
+        + ` → scale ${chosen} (budget ${FRAME_BUDGET_MS}ms)`);
+      this.saveQuality(chosen);
+      if (chosen !== this.resolutionScale) {
+        this.resolutionScale = chosen;
+        this.resize();
+      }
+    }
+
+    setQuality(scale) {
+      if (typeof scale !== 'number' || !Number.isFinite(scale)) {
+        warn('setQuality expects a number, got', scale);
+        return;
+      }
+      this.bench = null;
+      this.resolutionScale = Math.min(Math.max(scale, 0.25), 1.5);
+      this.saveQuality(this.resolutionScale);
+      this.resize();
+      if (!this.running) this.drawFrame();
+    }
+
+    retune() {
+      try { window.localStorage.removeItem(STORAGE_KEY); } catch { /* fine */ }
+      this.resolutionScale = FALLBACK_SCALE;
+      this.resize();
+      this.beginBench();
+      log('retuning…');
+    }
+
+    // ── frame ───────────────────────────────────────────────────────────────
 
     resize() {
-      // Render at a fraction of CSS pixels and let the browser upscale —
-      // the background is soft, so the difference is invisible, and the
-      // fragment count drops with the square of the scale.
+      if (!this.gl || !this.chain) return false;
       const width = Math.max(1, Math.round(window.innerWidth * this.resolutionScale));
       const height = Math.max(1, Math.round(window.innerHeight * this.resolutionScale));
-
       this.canvas.width = width;
       this.canvas.height = height;
-
-      this.gl.viewport(0, 0, width, height);
+      if (!this.chain.resize(width, height)) return false;
+      this.proxy?.resize(width, height);
+      this.updateCellMetrics();
+      return true;
     }
 
-    drawFrame() {
-      const gl = this.gl;
-      const time = (Date.now() - this.startTime) / 1000;
+    updateCellMetrics() {
+      const h = Math.max(8, Math.round(this.canvas.height / CELL_ROWS));
+      this.cursor.cellH = h;
+      this.cursor.cellW = Math.max(3, Math.round(h * CELL_ASPECT));
+    }
 
-      gl.useProgram(this.program);
-      gl.uniform2f(this.uniforms.resolution, this.canvas.width, this.canvas.height);
-      gl.uniform1f(this.uniforms.time, time);
+    /**
+     * Mouse → cursor uniforms. Quantized to a cell so a move reads as a discrete
+     * jump: cursor-comet measures `jump` in cell heights and only draws a full
+     * trail past MIN_JUMP, which a raw per-pixel mousemove stream would never
+     * produce cleanly.
+     */
+    onPointerMove(e) {
+      if (!this.ready || !this.canvas) return;
+      const scaleX = this.canvas.width / Math.max(1, window.innerWidth);
+      const scaleY = this.canvas.height / Math.max(1, window.innerHeight);
+      const { cellW, cellH } = this.cursor;
 
-      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+      const glX = e.clientX * scaleX;
+      const glY = this.canvas.height - e.clientY * scaleY;
+
+      // Report the TOP-LEFT of the cell in y-up coords: both cursor-comet and
+      // medium.glsl recover the centre as xy + vec2(z, -w) * 0.5.
+      const tlX = glX - cellW * 0.5;
+      const tlY = glY + cellH * 0.5;
+
+      const dx = tlX - this.cursor.cur[0];
+      const dy = tlY - this.cursor.cur[1];
+      if (dx * dx + dy * dy < cellH * cellH * 0.25) return;
+
+      this.cursor.prev = this.cursor.cur;
+      this.cursor.cur = [tlX, tlY];
+      this.cursor.changeTime = (performance.now() - this.startTime) / 1000;
+    }
+
+    refreshDate(nowMs) {
+      if (nowMs - this.dateStamp < 1000) return;
+      this.dateStamp = nowMs;
+      const d = new Date();
+      this.dateVec = [
+        d.getFullYear(), d.getMonth(), d.getDate(),
+        d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds(),
+      ];
+    }
+
+    drawFrame(forcedTime) {
+      if (!this.ready || !this.chain) return;
+      const nowMs = performance.now();
+      const time = forcedTime !== undefined ? forcedTime : (nowMs - this.startTime) / 1000;
+      const delta = this.lastRenderClock > 0
+        ? Math.min(0.25, (nowMs - this.lastRenderClock) / 1000)
+        : 1 / 60;
+      this.lastRenderClock = nowMs;
+
+      this.refreshDate(nowMs);
+      this.proxy?.update(nowMs);
+
+      this.chain.render(this.proxy?.texture ?? null, {
+        time,
+        delta,
+        frame: this.frame++,
+        date: this.dateVec,
+        cursor: this.cursor,
+      });
+
+      if (this.bench) this.tickBench(nowMs);
     }
 
     start() {
-      if (this.running) return;
+      if (this.running || !this.ready || this.failed) return;
       this.running = true;
       this.lastFrameTime = 0;
       this.animationId = requestAnimationFrame((t) => this.render(t));
@@ -583,7 +955,7 @@
 
     stop() {
       this.running = false;
-      if (this.animationId) {
+      if (this.animationId !== null) {
         cancelAnimationFrame(this.animationId);
         this.animationId = null;
       }
@@ -591,49 +963,62 @@
 
     render(currentTime = 0) {
       if (!this.running) return;
-
       const elapsed = currentTime - this.lastFrameTime;
-      if (elapsed >= this.frameInterval) {
-        this.lastFrameTime = currentTime - (elapsed % this.frameInterval);
+      // Bench frames run uncapped: the measurement wants back-to-back frames,
+      // and it only lasts ~36 of them.
+      if (this.bench || elapsed >= this.frameInterval) {
+        this.lastFrameTime = currentTime - (this.bench ? 0 : elapsed % this.frameInterval);
         this.drawFrame();
       }
-
       this.animationId = requestAnimationFrame((t) => this.render(t));
     }
 
+    // ── public API ──────────────────────────────────────────────────────────
+
     toggle(enabled) {
-      this.enabled = enabled;
-      this.canvas.style.display = enabled ? 'block' : 'none';
-      // Actually stop the loop when hidden — the old version kept rAF spinning.
-      if (enabled && !this.reducedMotion && !document.hidden) {
-        this.start();
-      } else {
-        this.stop();
-      }
+      this.enabled = enabled !== undefined ? !!enabled : !this.enabled;
+      if (this.canvas) this.canvas.style.display = this.enabled ? 'block' : 'none';
+      document.documentElement.classList.toggle('no-shader-bg', !this.enabled);
+      if (this.enabled && !this.reducedMotion && !document.hidden) this.start();
+      else this.stop();
+      return this.enabled;
     }
 
-    /** Runtime quality knob: shaderBg.setQuality(0.4..1.0) */
-    setQuality(scale) {
-      this.resolutionScale = Math.min(Math.max(scale, 0.25), 1.5);
-      this.resize();
-      if (!this.running) this.drawFrame();
+    status() {
+      return {
+        ok: this.ready && !this.failed,
+        chain: this.manifest?.chain ?? [],
+        passes: this.chain?.passes.length ?? 0,
+        resolution: this.canvas ? [this.canvas.width, this.canvas.height] : null,
+        scale: this.resolutionScale,
+        fps: this.targetFPS,
+        renderer: this.gl ? this.rendererTag() : null,
+        benching: this.bench !== null,
+        proxyRects: this.proxy?.lastRectCount ?? 0,
+        shaderTime: (performance.now() - this.startTime) / 1000,
+      };
     }
 
     destroy() {
       this.stop();
-      if (this.canvas) {
-        this.canvas.remove();
-      }
+      this.proxy?.destroy();
+      this.chain?.destroy();
+      this.canvas?.remove();
+      this.ready = false;
     }
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-      window.shaderBg = new ShaderBackground();
-      window.shaderBg.init();
-    });
-  } else {
+  function boot() {
     window.shaderBg = new ShaderBackground();
-    window.shaderBg.init();
+    window.shaderBg.init().catch((err) => {
+      warn('init threw:', err);
+      document.documentElement.classList.add('no-shader-bg');
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
   }
 })();

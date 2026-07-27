@@ -1,0 +1,38 @@
+{
+  "chain": [
+    "crt-glow.glsl",
+    "medium.glsl",
+    "cursor-comet.glsl",
+    "crt-finale.glsl"
+  ],
+  "support": [
+    "prologue.glsl",
+    "epilogue.glsl"
+  ],
+  "files": {
+    "crt-glow.glsl": {
+      "sha256": "162d0d54b631a77f",
+      "bytes": 13837
+    },
+    "medium.glsl": {
+      "sha256": "efbdc9cd4810b2d8",
+      "bytes": 84162
+    },
+    "cursor-comet.glsl": {
+      "sha256": "bd294cb03b4cfe1b",
+      "bytes": 5607
+    },
+    "crt-finale.glsl": {
+      "sha256": "c81bd6fb3057de28",
+      "bytes": 8169
+    },
+    "prologue.glsl": {
+      "sha256": "f23e12f485057ef7",
+      "bytes": 936
+    },
+    "epilogue.glsl": {
+      "sha256": "c29958ec299a4b01",
+      "bytes": 198
+    }
+  }
+}

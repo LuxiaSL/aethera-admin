@@ -5,7 +5,10 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "sync-shaders": "node scripts/sync-shaders.mjs",
+    "check-shaders": "node scripts/sync-shaders.mjs --check",
+    "verify-shaders": "node scripts/verify-shader-bg.mjs"
   },
   "keywords": [
     "admin",

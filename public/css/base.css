@@ -12,6 +12,22 @@ html {
   -moz-osx-font-smoothing: grayscale;
   scrollbar-width: thin;
   scrollbar-color: var(--border-color) var(--bg-primary);
+
+  /* Ghostty's `background`, and what the shader chain renders onto.
+     This is load-bearing, not decorative: body is transparent so the canvas
+     shows through, so without a color here the page is WHITE for the frames
+     before the canvas exists — and stays white for good if WebGL2 is
+     unavailable. */
+  background: #0f0a1a;
+}
+
+/* Fallback for no WebGL2 / failed shader compile / effect toggled off.
+   shader-bg.js sets .no-shader-bg on <html> in those cases. A still frame of
+   roughly what the chain settles to: violet void, brighter toward the middle. */
+html.no-shader-bg {
+  background:
+    radial-gradient(ellipse 120% 80% at 50% 45%, #1a1030 0%, #0f0a1a 55%, #08050f 100%);
+  background-attachment: fixed;
 }
 
 body {
